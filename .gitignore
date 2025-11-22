@@ -1,0 +1,11 @@
+# Dependencias de Node
+/node_modules
+
+# Archivos de configuración local y secretos
+.env
+.env.local
+*.log
+
+# Entornos de desarrollo/OS
+npm-debug.log*
+.DS_Store
