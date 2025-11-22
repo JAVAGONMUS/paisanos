@@ -3,6 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const { authenticateAll } = require('./config/databases'); // <-- NUEVO
 // const driverRoutes = require('./routes/driverRoutes'); // Rutas para el conductor
+const driverRoutes = require('./routes/driverRoutes');
 const { initSocketIO } = require('./sockets/socketHandler'); // Lógica de Socket.io
 
 const app = express();
