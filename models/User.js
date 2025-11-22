@@ -2,8 +2,7 @@ const { DataTypes } = require('sequelize');
 const { sequelizePostgres } = require('../config/databases');
 // ... define el modelo Driver usando sequelizePostgres
 
-
-const Driver = sequelize.define('Driver', {
+const Driver = sequelizePostgres.define('Driver', {
   driver_id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
