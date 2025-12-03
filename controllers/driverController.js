@@ -62,4 +62,68 @@ exports.updateStatus = async (req, res) => {
     }
 };
 
+exports.registerDriver = async (req, res) => {
+    const { 
+        nombres, apellidos, dpi, vencimientoDPI, licencia, 
+        vencimientoLicencia, nit, fechaNacimiento, telefono, 
+        celular, numeralDireccion, zonaDireccion, coloniaDireccion,
+        departamentoDireccion, municipioDireccion, email1, password 
+    } = req.body;
+    
+    // Asignación de variables para el backend
+    const email = email1; // Usamos email1 como el email principal
+
+    try {
+        // 1. Verificar si el usuario/email ya existe
+        const existingUser = await User.findOne({ where: { email } });
+        if (existingUser) {
+            // Devolver un error JSON claro
+            return res.status(409).json({ message: 'El Email Principal ya está registrado.' });
+        }
+
+        // 2. Hash de la Contraseña y creación del Usuario
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // NOTA: Asumo que debes crear una entrada en 'User' primero (para auth)
+        const newUser = await User.create({
+            email: email, 
+            password: hashedPassword,
+            role: 'driver' // O el rol que manejes
+        });
+
+        // 3. Crear el Conductor y asociarlo con el nuevo Usuario
+        await Driver.create({
+            user_id: newUser.user_id, // Usar el ID del nuevo usuario
+            nombres, 
+            apellidos, 
+            dpi, 
+            vencimiento_dpi: vencimientoDPI, // Usar snake_case si tu modelo lo requiere
+            licencia, 
+            vencimiento_licencia: vencimientoLicencia, 
+            nit, 
+            fecha_nacimiento: fechaNacimiento,
+            telefono, 
+            celular, 
+            numeral_direccion: numeralDireccion, 
+            zona_direccion: zonaDireccion, 
+            colonia_direccion: coloniaDireccion,
+            departamento_direccion: departamentoDireccion,
+            municipio_direccion: municipioDireccion,
+            // Inicializar como pendiente de aprobación
+            status: 'pendiente_aprobacion', 
+        });
+
+        // 4. Respuesta exitosa (JSON)
+        // El frontend espera esta respuesta JSON.
+        res.status(201).json({ 
+            message: 'Registro de conductor exitoso. Esperando aprobación.' 
+        });
+
+    } catch (error) {
+        console.error('Error en Registro de Conductor:', error);
+        // Devolver un error JSON en caso de fallo
+        res.status(500).json({ message: 'Error interno al procesar el registro.' });
+    }
+};
+
 // ... otras funciones como getTripHistory, acceptTrip, rejectTrip
