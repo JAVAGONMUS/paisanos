@@ -1,57 +1,116 @@
 const { DataTypes } = require('sequelize');
 
-// 🔑 CLAVE 1: Debe importar y usar la conexión de MySQL
-const { sequelizeMysql } = require('../config/databases'); 
+// 🔑 CLAVE: Asegúrate de que esta variable coincida EXACTAMENTE con la exportación en databases.js
+const { sequelizeMySQL } = require('../config/databases'); 
 
-// Renombrar el modelo a 'Persona' puede ser más claro, pero lo dejamos como 'User' 
-// para no tener que cambiar las importaciones en el DriverController.js.
-const User = sequelizeMysql.define('User', {
-    // 🔑 CLAVE 2: La llave primaria de la tabla PERSONAS en MySQL
+// Definición del modelo para la tabla PERSONAS en MySQL
+const User = sequelizeMySQL.define('User', {
+    // LLAVE PRIMARIA: ID_PERSO
     ID_PERSO: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
+        field: 'ID_PERSO', // Columna en BD: ID_PERSO
     },
-    // Mapeo de los campos del formulario a la tabla PERSONAS (MySQL)
-    NOMBRES: {
+    // DATOS PERSONALES
+    nombres: {
         type: DataTypes.STRING,
         allowNull: false,
+        field: 'NOMBRE', // Columna en BD: NOMBRE
     },
-    APELLIDOS: {
+    apellidos: {
         type: DataTypes.STRING,
         allowNull: false,
+        field: 'APELLIDO', // Columna en BD: APELLIDO
     },
-    // Asumiendo que el campo para email principal es EMAIL1
-    EMAIL1: {
+    // DOCUMENTOS E IDENTIFICACIÓN
+    dpi: { 
+        type: DataTypes.STRING, 
+        field: 'DPI' 
+    },
+    vencimientoDPI: { 
+        type: DataTypes.DATEONLY, 
+        field: 'VENCE_DPI' // Columna en BD: VENCE_DPI
+    },
+    licencia: { 
+        type: DataTypes.STRING, 
+        field: 'LICENCIA' 
+    },
+    vencimientoLicencia: { 
+        type: DataTypes.DATEONLY, 
+        field: 'VENCE_LICENCIA' // Columna en BD: VENCE_LICENCIA
+    },
+    nit: { 
+        type: DataTypes.STRING, 
+        field: 'NIT' 
+    },
+    fechaNacimiento: { 
+        type: DataTypes.DATEONLY, 
+        field: 'NACIMIENTO' // Columna en BD: NACIMIENTO
+    },
+    // CONTACTO
+    telefono: { 
+        type: DataTypes.STRING, 
+        field: 'TELEFONO' 
+    },
+    celular: { 
+        type: DataTypes.STRING, 
+        field: 'CELULAR' 
+    },
+    email1: { // Email principal para login/registro
         type: DataTypes.STRING,
         allowNull: false,
         unique: true,
+        field: 'CORREO1', // Columna en BD: CORREO1
     },
-    PASSWORD: { // Para el login
+    email2: { 
+        type: DataTypes.STRING, 
+        field: 'CORREO2' // Columna en BD: CORREO2
+    },
+    // DIRECCIÓN
+    numeralDireccion: { 
+        type: DataTypes.STRING, 
+        field: 'NUM_DIREC' // Columna en BD: NUM_DIREC
+    },
+    zonaDireccion: { 
+        type: DataTypes.STRING, 
+        field: 'ZONA_DIREC' 
+    },
+    coloniaDireccion: { 
+        type: DataTypes.STRING, 
+        field: 'COL_DIREC' 
+    },
+    departamentoDireccion: { 
+        type: DataTypes.STRING, 
+        field: 'DEP_DIREC' 
+    },
+    municipioDireccion: { 
+        type: DataTypes.STRING, 
+        field: 'MUN_DIREC' 
+    },
+    
+    // DATOS DE USUARIO/SISTEMA (Asumimos que la tabla PERSONAS también guarda la contraseña y campos de auditoría)
+    password: { // Campo para la contraseña hasheada
         type: DataTypes.STRING,
         allowNull: false,
+        field: 'PASSWORD', // Asumimos que la columna en BD es PASSWORD
     },
-    // Mapeo del resto de campos de la tabla PERSONAS
-    DPI: { type: DataTypes.STRING },
-    VENCIMIENTO_DPI: { type: DataTypes.DATEONLY },
-    LICENCIA: { type: DataTypes.STRING },
-    VENCIMIENTO_LICENCIA: { type: DataTypes.DATEONLY },
-    NIT: { type: DataTypes.STRING },
-    FECHA_NACIMIENTO: { type: DataTypes.DATEONLY },
-    TELEFONO: { type: DataTypes.STRING },
-    CELULAR: { type: DataTypes.STRING },
-    NUMERAL_DIRECCION: { type: DataTypes.STRING },
-    ZONA_DIRECCION: { type: DataTypes.STRING },
-    COLONIA_DIRECCION: { type: DataTypes.STRING },
-    DEPARTAMENTO_DIRECCION: { type: DataTypes.STRING },
-    MUNICIPIO_DIRECCION: { type: DataTypes.STRING },
-    EMAIL2: { type: DataTypes.STRING }, // Si la tabla PERSONAS lo tiene
-    // Otros campos si existen en la tabla PERSONAS...
+    userNewData: { // Columna para el usuario que ingresa el dato
+        type: DataTypes.STRING,
+        field: 'USER_NEW_DATA',
+    },
+    // NOTA: Si usas la tabla USUARIOS para guardar la contraseña, la lógica de registro
+    // en driverController.js deberá cambiar para CREAR dos registros:
+    // 1. PERSONA (datos personales)
+    // 2. USUARIO (ID_PERSO, contraseña, etc.)
+
 }, {
-    // 🔑 CLAVE 3: Mapear al nombre de la tabla correcto en MySQL
     tableName: 'PERSONAS', 
-    timestamps: true, // Asume que la tabla PERSONAS usa los timestamps por defecto de Sequelize
-    freezeTableName: true, 
+    // Los campos 'FECHA_ALTA' y 'HORA_ALTA' sugieren que NO quieres que Sequelize maneje los timestamps automáticos.
+    timestamps: false, 
+    freezeTableName: true,
+    // Si tu tabla usa snake_case (NOMBRE, APELLIDO) y quieres que Sequelize lo gestione por defecto
+    // underscored: true,
 });
 
 module.exports = User;
