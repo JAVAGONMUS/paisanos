@@ -1,8 +1,8 @@
 const { DataTypes } = require('sequelize');
-// Asumiendo que esta ruta es correcta y trae la instancia de conexión PG
-const { sequelizePostgres } = require('../config/databases'); 
 
-// ... define el modelo Driver usando sequelizePostgres
+// ✅ USAMOS DESESTRUCTURACIÓN: Accede directamente a la propiedad 'sequelizePostgres' 
+// exportada desde el objeto en databases.js
+const { sequelizePostgres } = require('../config/databases'); 
 
 const Driver = sequelizePostgres.define('Driver', {
   driver_id: {
@@ -30,7 +30,7 @@ const Driver = sequelizePostgres.define('Driver', {
     allowNull: true,
   }
 }, {
-  // ✨ MODIFICACIÓN CLAVE: Usar el nombre exacto de la tabla en PostgreSQL ✨
+  // Nombre de tabla corregido
   tableName: 'CONDUCTORES',
   timestamps: false,
 });
