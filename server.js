@@ -1,49 +1,76 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const { authenticateAll } = require('./config/databases'); // <-- NUEVO
-// const driverRoutes = require('./routes/driverRoutes'); // Rutas para el conductor
-const driverRoutes = require('./routes/driverRoutes');
-const { initSocketIO } = require('./sockets/socketHandler'); // Lógica de Socket.io
+// 💡 Importamos el nuevo nombre de la función de autenticación y las instancias de DB
+const { authenticateDBs, sequelizePostgres } = require('./config/databases'); 
+
+// 💡 IMPORTAR MODELOS DE POSTGRESQL AQUÍ (rompe la dependencia circular)
+const Driver = require('./models/Driver'); // Tabla: CONDUCTORES
+// const GpsHistory = require('./models/GpsHistory'); 
+// ... importa el resto de tus modelos PG aquí
+
+// Lista de modelos a sincronizar
+const pgModels = [
+    Driver,
+    // ... añade el resto aquí
+];
+
+const driverRoutes = require('./routes/driverRoutes'); 
+const { initSocketIO } = require('./sockets/socketHandler'); 
 
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de CORS para Socket.io (ajusta 'origin' al dominio de tu app Expo)
+// Configuración de CORS
 const io = new Server(server, {
-  cors: {
-    origin: "*", // Cambiar por la URL de tu frontend en producción
-    methods: ["GET", "POST"]
-  }
+  cors: {
+    origin: "*", 
+    methods: ["GET", "POST"]
+  }
 });
 
 // Middleware Global
 app.use(express.json());
 
-// Rutas de la API (por ejemplo, para Login y Historial)
+// Rutas de la API
 app.use('/api/drivers', driverRoutes);
 
-// Inicializar la lógica de Socket.io (Ubicación, Solicitudes, etc.)
+// Inicializar la lógica de Socket.io
 initSocketIO(io);
 
 // Middleware para manejo de errores (opcional)
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).send('¡Algo salió mal!');
+    console.error(err.stack);
+    res.status(500).send('¡Algo salió mal!');
 });
 
 
 const PORT = process.env.PORT || 3000;
 
-// Sincronizar Base de Datos y Arrancar Servidor
-authenticateAll() // <-- USAR LA FUNCIÓN DUAL
-  .then(() => {
-    server.listen(PORT, () => {
-      // Usar '0.0.0.0' en producción/contenedores como Railway
-      console.log(`🚀 Servidor Express y Socket.io escuchando en puerto ${PORT}`); 
-    });
-  })
-  .catch(err => {
-    console.error('❌ Error fatal al iniciar el servidor:', err);
-    process.exit(1);
-  });
+// --- Nueva Lógica de Sincronización y Arranque ---
+async function startServer() {
+    try {
+        // 1. Autenticar (Conectar) las bases de datos
+        await authenticateDBs(); 
+
+        // 2. Sincronizar los modelos de PostgreSQL
+        console.log('Iniciando sincronización de modelos PostgreSQL...');
+        for (const Model of pgModels) {
+            await Model.sync({ alter: true }); 
+            console.log(`   * Tabla ${Model.tableName || Model.name} sincronizada.`);
+        }
+        console.log('✅ Todos los modelos de PostgreSQL sincronizados exitosamente.');
+
+        // 3. Arrancar el servidor
+        server.listen(PORT, () => {
+            console.log(`🚀 Servidor Express y Socket.io escuchando en puerto ${PORT}`); 
+        });
+
+    } catch (err) {
+        console.error('❌ Error fatal al iniciar el servidor:', err);
+        // Termina el proceso si no se puede conectar a la DB
+        process.exit(1);
+    }
+}
+
+startServer(); // Llama a la función asíncrona para iniciar
