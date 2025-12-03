@@ -1,7 +1,7 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-// --- 1. Conexión MySQL (Transaccional) ---
+// --- Conexión MySQL ---
 const sequelizeMySQL = new Sequelize(
   process.env.MYSQL_DB_NAME,
   process.env.MYSQL_DB_USER,
@@ -17,7 +17,7 @@ const sequelizeMySQL = new Sequelize(
   }
 );
 
-// --- 2. Conexión PostgreSQL (Geoespacial/GIS) ---
+// --- Conexión PostgreSQL ---
 const sequelizePostgres = new Sequelize(
   process.env.PG_DB_NAME,
   process.env.PG_DB_USER,
@@ -38,14 +38,11 @@ module.exports = {
   sequelizeMySQL,
   sequelizePostgres,
   
-  // 💡 Esta función solo autentica (verifica la conexión), ya no sincroniza.
+  // Función renombrada para ser más clara: solo autentica
   authenticateDBs: async () => {
     try {
-        // --- Autenticación MySQL ---
         await sequelizeMySQL.authenticate();
         console.log('✅ Conexión MySQL (Transaccional) establecida.');
-
-        // --- Autenticación PostgreSQL ---
         await sequelizePostgres.authenticate();
         console.log('✅ Conexión PostgreSQL (Geo) establecida.');
 
