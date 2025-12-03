@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const driverController = require('../controllers/driverController');
-const verifyToken = require.require('../middlewares/authMiddleware');
+const verifyToken = require('../middlewares/authMiddleware');
 
 // --- RUTAS PÚBLICAS ---
 router.post('/login', driverController.loginDriver);
