@@ -1,7 +1,6 @@
 const { DataTypes } = require('sequelize');
 
-// ✅ USAMOS DESESTRUCTURACIÓN: Accede directamente a la propiedad 'sequelizePostgres' 
-// exportada desde el objeto en databases.js
+// ✅ Importación por desestructuración. Esto ya no causará un error circular.
 const { sequelizePostgres } = require('../config/databases'); 
 
 const Driver = sequelizePostgres.define('Driver', {
@@ -10,12 +9,11 @@ const Driver = sequelizePostgres.define('Driver', {
     primaryKey: true,
     autoIncrement: true,
   },
-  user_id: { // Clave foránea a la tabla de Usuarios para el Login
+  user_id: { 
     type: DataTypes.INTEGER,
     allowNull: false,
     unique: true
   },
-  // Estado: 'disponible', 'no_disponible', 'en_viaje'
   status: { 
     type: DataTypes.STRING,
     allowNull: false,
@@ -30,7 +28,7 @@ const Driver = sequelizePostgres.define('Driver', {
     allowNull: true,
   }
 }, {
-  // Nombre de tabla corregido
+  // Nombre de tabla en PostgreSQL
   tableName: 'CONDUCTORES',
   timestamps: false,
 });
