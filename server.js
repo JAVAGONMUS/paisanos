@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-// 💡 Importamos el nuevo nombre de la función de autenticación y las instancias de DB
+// 💡 Importamos la función de autenticación y las instancias de DB
 const { authenticateDBs, sequelizePostgres } = require('./config/databases'); 
 
 // 💡 IMPORTAR MODELOS DE POSTGRESQL AQUÍ (rompe la dependencia circular)
@@ -47,7 +47,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-// --- Nueva Lógica de Sincronización y Arranque ---
+// --- Lógica de Sincronización y Arranque ---
 async function startServer() {
     try {
         // 1. Autenticar (Conectar) las bases de datos
@@ -56,6 +56,7 @@ async function startServer() {
         // 2. Sincronizar los modelos de PostgreSQL
         console.log('Iniciando sincronización de modelos PostgreSQL...');
         for (const Model of pgModels) {
+            // Se usa { alter: true } para crear/actualizar la estructura de la tabla
             await Model.sync({ alter: true }); 
             console.log(`   * Tabla ${Model.tableName || Model.name} sincronizada.`);
         }
@@ -67,10 +68,9 @@ async function startServer() {
         });
 
     } catch (err) {
-        console.error('❌ Error fatal al iniciar el servidor:', err);
-        // Termina el proceso si no se puede conectar a la DB
+        console.error('❌ Error fatal al iniciar el servidor (DB):', err);
         process.exit(1);
     }
 }
 
-startServer(); // Llama a la función asíncrona para iniciar
+startServer();
