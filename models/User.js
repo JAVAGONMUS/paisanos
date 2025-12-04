@@ -89,21 +89,6 @@ const User = sequelizeMySQL.define('User', {
         field: 'MUN_DIREC' 
     },
     
-    // DATOS DE USUARIO/SISTEMA (Asumimos que la tabla PERSONAS también guarda la contraseña y campos de auditoría)
-    password: { // Campo para la contraseña hasheada
-        type: DataTypes.STRING,
-        allowNull: false,
-        field: 'PASSWORD', // Asumimos que la columna en BD es PASSWORD
-    },
-    userNewData: { // Columna para el usuario que ingresa el dato
-        type: DataTypes.STRING,
-        field: 'USER_NEW_DATA',
-    },
-    // NOTA: Si usas la tabla USUARIOS para guardar la contraseña, la lógica de registro
-    // en driverController.js deberá cambiar para CREAR dos registros:
-    // 1. PERSONA (datos personales)
-    // 2. USUARIO (ID_PERSO, contraseña, etc.)
-
 }, {
     tableName: 'PERSONAS', 
     // Los campos 'FECHA_ALTA' y 'HORA_ALTA' sugieren que NO quieres que Sequelize maneje los timestamps automáticos.
@@ -114,7 +99,3 @@ const User = sequelizeMySQL.define('User', {
 });
 
 module.exports = User;
-
-
-
-        
