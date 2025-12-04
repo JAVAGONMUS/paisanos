@@ -89,6 +89,16 @@ const User = sequelizeMySQL.define('User', {
         field: 'MUN_DIREC' 
     },
     
+    // Mapeo a ID de Departamento
+    departamentoDireccion: { 
+        type: DataTypes.INTEGER, // Tipo de dato que espera la BD
+        field: 'DEP_DIREC' 
+    },
+    // Mapeo a ID de Municipio
+    municipioDireccion: { 
+        type: DataTypes.INTEGER, // Tipo de dato que espera la BD
+        field: 'MUN_DIREC' 
+    },    
 }, {
     tableName: 'PERSONAS', 
     // Los campos 'FECHA_ALTA' y 'HORA_ALTA' sugieren que NO quieres que Sequelize maneje los timestamps automáticos.
