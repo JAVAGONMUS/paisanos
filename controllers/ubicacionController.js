@@ -1,7 +1,8 @@
 // /app/controllers/ubicacionController.js
 
-const { setupAssociations } = require('../config/associations');
-const { Departamento, Municipio } = setupAssociations(); // Usamos los modelos relacionados
+// 🔑 IMPORTAR MODELOS DIRECTAMENTE, NO EJECUTAR setupAssociations aquí.
+const Departamento = require('../models/Departamento');
+const Municipio = require('../models/Municipio'); 
 
 // Obtener el ID de país por defecto de la variable de entorno
 const DEFAULT_COUNTRY_ID = process.env.DEFAULT_COUNTRY_ID; 
@@ -12,14 +13,14 @@ exports.getUbicaciones = async (req, res) => {
     }
 
     try {
-        // Consulta: Trae DEPARTAMENTOS donde ID_PAIS sea el por defecto,
-        // e INCLUYE todos sus MUNICIPIOS relacionados.
+        // Consulta: Trae DEPARTAMENTOS donde ID_PAIS sea el por defecto.
+        // Las asociaciones ('municipios') ya están cargadas globalmente por server.js.
         const departamentos = await Departamento.findAll({
             where: { ID_PAIS: DEFAULT_COUNTRY_ID },
-            attributes: ['ID_DEP', 'NOMBRE', 'CODIGO'], // Campos necesarios para el frontend/registro
+            attributes: ['ID_DEP', 'NOMBRE', 'CODIGO'], 
             include: [{
                 model: Municipio,
-                as: 'municipios',
+                as: 'municipios', // Usamos el alias definido en associations.js
                 attributes: ['ID_MUN', 'NOMBRE'],
             }],
             order: [['NOMBRE', 'ASC']],
