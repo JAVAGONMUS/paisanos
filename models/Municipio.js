@@ -1,6 +1,6 @@
 // /app/models/Municipio.js
-const { DataTypes } = require = ('sequelize');
-const { sequelizeMySQL } = require('../config/databases'); 
+const { DataTypes } = require('sequelize'); 
+const { sequelizeMySQL } = require('../config/databases');
 
 const Municipio = sequelizeMySQL.define('Municipio', {
     ID_MUN: {
