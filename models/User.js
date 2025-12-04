@@ -114,3 +114,7 @@ const User = sequelizeMySQL.define('User', {
 });
 
 module.exports = User;
+
+
+
+        
