@@ -28,13 +28,19 @@ exports.registerDriver = async (req, res) => {
 
     try {
         // 2. VERIFICAR si el email ya existe en la tabla PERSONAS (CORREO1)
-        const existingPerson = await User.findOne({ where: { CORREO1: email } });
+        // 🔑 AJUSTE CLAVE: Usamos 'attributes' para seleccionar SÓLO ID_PERSO.
+        // Esto evita que Sequelize intente seleccionar campos inexistentes como 'PASSWORD'.
+        const existingPerson = await User.findOne({ 
+            where: { CORREO1: email },
+            attributes: ['ID_PERSO'] // Solo necesitamos saber si existe
+        });
+        
         if (existingPerson) {
             return res.status(409).json({ message: 'El Email Principal ya está registrado en el sistema.' });
         }
         
         // 3. CREACIÓN del registro en la tabla PERSONAS (MySQL)
-        // Usamos los nombres de las propiedades del modelo (Camel Case) que Sequelize mapea a las columnas de la BD (Mayúsculas)
+        // Este bloque ya fue revisado para NO incluir 'password'
         const newPerson = await User.create({
             nombres, 
             apellidos, 
@@ -53,12 +59,12 @@ exports.registerDriver = async (req, res) => {
             municipioDireccion,
             email1: email1,
             email2: email2,
-            FECHA_ALTA: fechaAlta, // Se pasa el valor explícito para columnas personalizadas
+            FECHA_ALTA: fechaAlta, 
             HORA_ALTA: horaAlta,
             userNewData,
         });
 
-        // 4. OBTENER la llave primaria (ID_PERSO) de la nueva persona creada
+        // 4. OBTENER la llave primaria (ID_PERSO)
         const idPerso = newPerson.ID_PERSO; 
 
         // 5. Hash de la Contraseña y CREACIÓN del registro en la tabla USUARIOS (MySQL)
@@ -68,7 +74,7 @@ exports.registerDriver = async (req, res) => {
             ID_PERSO: idPerso,
             ID_PER: ID_PERFIL_CONDUCTOR, 
             ESTADO: 'ACTIVO', 
-            USUARIO: email, // Usar el email como nombre de usuario
+            USUARIO: email, 
             PASSWORD: hashedPassword,
             FECHA_ALTA: fechaAlta,
             HORA_ALTA: horaAlta,
@@ -82,7 +88,6 @@ exports.registerDriver = async (req, res) => {
             UBICACION_LON: null,
             STATUS: 'pendiente_aprobacion', 
             IS_ONLINE: false,
-            // Otros campos de CONDUCTORES se inicializan por defecto
         });
 
         // 7. Respuesta exitosa
@@ -105,7 +110,7 @@ exports.loginDriver = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // 1. Buscar credenciales en la tabla USUARIOS (MySQL) usando el email como USUARIO
+        // La búsqueda en USUARIOS es correcta porque esa tabla SÍ tiene PASSWORD
         const userCredentials = await Usuario.findOne({ where: { USUARIO: email } }); 
 
         if (!userCredentials || !bcrypt.compareSync(password, userCredentials.PASSWORD)) {
@@ -114,21 +119,16 @@ exports.loginDriver = async (req, res) => {
 
         const ID_PERSO_USER = userCredentials.ID_PERSO; 
         
-        // 2. Verificar que el ID_PERSO sea un conductor registrado (en PostgreSQL/CONDUCTORES)
         const driver = await Driver.findOne({ where: { ID_PERSO: ID_PERSO_USER } });
         if (!driver) {
             return res.status(403).json({ message: 'Usuario no es un conductor registrado o no tiene registro activo.' });
         }
 
-        // 3. Generar Token JWT
         const token = jwt.sign(
             { userId: ID_PERSO_USER, driverId: driver.ID_COND, role: 'driver' }, 
             process.env.JWT_SECRET, 
             { expiresIn: '1d' }
         );
-
-        // Opcional: Podrías buscar los datos de la persona en la tabla PERSONAS aquí para retornar más info
-        // const person = await User.findByPk(ID_PERSO_USER);
         
         res.json({ token, driver });
     } catch (error) {
