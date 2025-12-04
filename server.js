@@ -4,15 +4,15 @@ const { Server } = require('socket.io');
 
 // 💡 Importamos la función de autenticación y las instancias de DB
 const { authenticateDBs, sequelizePostgres } = require('./config/databases'); 
-const { setupAssociations } = require('./config/associations'); // 🔑 Importamos las asociaciones
-const Pais = require('./models/Pais');
-const Departamento = require('./models/Departamento');
-const Municipio = require('./models/Municipio');
+const { setupAssociations } = require('./config/associations'); // Importamos la función para configurar relaciones
 
 // 💡 IMPORTAR MODELOS DE POSTGRESQL AQUÍ 
 const Driver = require('./models/Driver'); // Tabla: CONDUCTORES
 // const GpsHistory = require('./models/GpsHistory'); 
 // ... importa el resto de tus modelos PG aquí
+
+// ⚠️ NOTA: Los modelos de catálogo (Pais, Departamento, Municipio) NO SE DEBEN PONER en pgModels.
+// Se cargan implícitamente a través de sus archivos .js y luego setupAssociations los usa.
 
 // Lista de modelos de PostgreSQL a sincronizar
 const pgModels = [
@@ -20,11 +20,9 @@ const pgModels = [
     // ... añade el resto aquí
 ];
 
-// Lista de modelos de MySQL de catálogo (No necesitan sync en el arranque si ya existen)
-// const mysqlCatalogModels = [Pais, Departamento, Municipio]; 
-
+// Importar rutas
 const driverRoutes = require('./routes/driverRoutes'); 
-const ubicacionRoutes = require('./routes/ubicacionRoutes'); // 🔑 Ruta para el catálogo
+const ubicacionRoutes = require('./routes/ubicacionRoutes'); 
 const { initSocketIO } = require('./sockets/socketHandler'); 
 
 const app = express();
@@ -41,9 +39,9 @@ const io = new Server(server, {
 // Middleware Global
 app.use(express.json());
 
-// 🔑 RUTAS DE LA API
+// RUTAS DE LA API
 app.use('/api/drivers', driverRoutes);
-app.use('/api', ubicacionRoutes); // Usamos una ruta base para los catálogos
+app.use('/api', ubicacionRoutes); 
 
 // Inicializar la lógica de Socket.io
 initSocketIO(io);
@@ -63,7 +61,8 @@ async function startServer() {
         // 1. Autenticar (Conectar) las bases de datos
         await authenticateDBs(); 
         
-        // 🔑 2. ESTABLECER ASOCIACIONES: ¡Debe ir ANTES de cualquier uso de modelos!
+        // 2. ESTABLECER ASOCIACIONES (MySQL): 
+        // Esta es la ÚNICA llamada a setupAssociations en toda la aplicación.
         setupAssociations();
         console.log('✅ Asociaciones de Sequelize establecidas.');
 
