@@ -23,89 +23,48 @@ const User = sequelizeMySQL.define('User', {
         allowNull: false,
         field: 'APELLIDO', // Columna en BD: APELLIDO
     },
-    // DOCUMENTOS E IDENTIFICACIÓN
-    dpi: { 
-        type: DataTypes.STRING, 
-        field: 'DPI' 
-    },
-    vencimientoDPI: { 
-        type: DataTypes.DATEONLY, 
-        field: 'VENCE_DPI' // Columna en BD: VENCE_DPI
-    },
-    licencia: { 
-        type: DataTypes.STRING, 
-        field: 'LICENCIA' 
-    },
-    vencimientoLicencia: { 
-        type: DataTypes.DATEONLY, 
-        field: 'VENCE_LICENCIA' // Columna en BD: VENCE_LICENCIA
-    },
-    nit: { 
-        type: DataTypes.STRING, 
-        field: 'NIT' 
-    },
-    fechaNacimiento: { 
-        type: DataTypes.DATEONLY, 
-        field: 'NACIMIENTO' // Columna en BD: NACIMIENTO
-    },
-    // CONTACTO
-    telefono: { 
-        type: DataTypes.STRING, 
-        field: 'TELEFONO' 
-    },
-    celular: { 
-        type: DataTypes.STRING, 
-        field: 'CELULAR' 
-    },
-    email1: { // Email principal para login/registro
-        type: DataTypes.STRING,
-        allowNull: false,
-        unique: true,
-        field: 'CORREO1', // Columna en BD: CORREO1
-    },
-    email2: { 
-        type: DataTypes.STRING, 
-        field: 'CORREO2' // Columna en BD: CORREO2
-    },
-    // DIRECCIÓN
-    numeralDireccion: { 
-        type: DataTypes.STRING, 
-        field: 'NUM_DIREC' // Columna en BD: NUM_DIREC
-    },
-    zonaDireccion: { 
-        type: DataTypes.STRING, 
-        field: 'ZONA_DIREC' 
-    },
-    coloniaDireccion: { 
-        type: DataTypes.STRING, 
-        field: 'COL_DIREC' 
-    },
-    departamentoDireccion: { 
-        type: DataTypes.STRING, 
-        field: 'DEP_DIREC' 
-    },
-    municipioDireccion: { 
-        type: DataTypes.STRING, 
-        field: 'MUN_DIREC' 
-    },
-    
+    // ... (El resto de campos de datos personales/contacto/dirección se mantienen) ...
+    dpi: { type: DataTypes.STRING, field: 'DPI' },
+    vencimientoDPI: { type: DataTypes.DATEONLY, field: 'VENCE_DPI' },
+    licencia: { type: DataTypes.STRING, field: 'LICENCIA' },
+    vencimientoLicencia: { type: DataTypes.DATEONLY, field: 'VENCE_LICENCIA' },
+    nit: { type: DataTypes.STRING, field: 'NIT' },
+    fechaNacimiento: { type: DataTypes.DATEONLY, field: 'NACIMIENTO' },
+    telefono: { type: DataTypes.STRING, field: 'TELEFONO' },
+    celular: { type: DataTypes.STRING, field: 'CELULAR' },
+    email1: { type: DataTypes.STRING, allowNull: false, unique: true, field: 'CORREO1' },
+    email2: { type: DataTypes.STRING, field: 'CORREO2' },
+    numeralDireccion: { type: DataTypes.STRING, field: 'NUM_DIREC' },
+    zonaDireccion: { type: DataTypes.STRING, field: 'ZONA_DIREC' },
+    coloniaDireccion: { type: DataTypes.STRING, field: 'COL_DIREC' },
     // Mapeo a ID de Departamento
     departamentoDireccion: { 
-        type: DataTypes.INTEGER, // Tipo de dato que espera la BD
+        type: DataTypes.INTEGER, 
         field: 'DEP_DIREC' 
     },
     // Mapeo a ID de Municipio
     municipioDireccion: { 
-        type: DataTypes.INTEGER, // Tipo de dato que espera la BD
+        type: DataTypes.INTEGER, 
         field: 'MUN_DIREC' 
     },    
+    // AUDITORÍA
+    FECHA_ALTA: {
+        type: DataTypes.DATEONLY, // Usar DATEONLY para YYYY-MM-DD
+        field: 'FECHA_ALTA',
+    },
+    HORA_ALTA: {
+        type: DataTypes.TIME, // Usar TIME para HH:MM:SS
+        field: 'HORA_ALTA',
+    },
+    USER_NEW_DATA: {
+        // 💡 Tipo cambiado a INTEGER, ya que hace referencia a un ID_PERSO (que es INTEGER)
+        type: DataTypes.INTEGER, 
+        field: 'USER_NEW_DATA',
+    },
 }, {
     tableName: 'PERSONAS', 
-    // Los campos 'FECHA_ALTA' y 'HORA_ALTA' sugieren que NO quieres que Sequelize maneje los timestamps automáticos.
     timestamps: false, 
     freezeTableName: true,
-    // Si tu tabla usa snake_case (NOMBRE, APELLIDO) y quieres que Sequelize lo gestione por defecto
-    // underscored: true,
 });
 
 module.exports = User;
