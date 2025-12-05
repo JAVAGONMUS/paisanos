@@ -6,35 +6,53 @@ const Usuario = require('../models/Usuario'); // Tabla USUARIOS (MySQL)
 require('dotenv').config();
 
 // =========================================================================
-// FUNCIÓN DE REGISTRO (exports.registerDriver)
+// FUNCIÓN AUXILIAR: Conversión de Fecha
+// Convierte el formato de usuario DD/MM/AAAA a formato DB AAAA-MM-DD
 // =========================================================================
+const convertDateToDBFormat = (dateString) => {
+    if (!dateString) return null;
+    const parts = dateString.split('/'); // dd/mm/aaaa
+    if (parts.length !== 3) return null;
+    return `${parts[2]}-${parts[1]}-${parts[0]}`; // aaaa-mm-dd
+};
+
 
 exports.registerDriver = async (req, res) => {
-    // 1. Obtener datos del formulario
+    // 1. Obtener datos del formulario, incluyendo los nuevos campos de email
     const { 
         nombres, apellidos, dpi, vencimientoDPI, licencia, 
         vencimientoLicencia, nit, fechaNacimiento, telefono, 
         celular, numeralDireccion, zonaDireccion, coloniaDireccion,
-        departamentoDireccion, municipioDireccion, email1, email2, password 
+        departamentoDireccion, municipioDireccion, 
+        emailUserPart1, domain1, // Nuevo: Email Principal
+        emailUserPart2, domain2, // Nuevo: Email Secundario
+        password 
     } = req.body;
     
-    // --- VARIABLES DE AUDITORÍA Y CLAVE ---
-    const email = email1; 
+    // --- PREPARACIÓN DE DATOS ---
     
-    // 💡 Valores de fecha y hora actuales en formato MySQL
+    // 💥 1. RECONSTRUCCIÓN DE EMAILS
+    const fullEmail1 = emailUserPart1 + (domain1 || ''); // Requerido
+    // El email secundario es opcional, solo se reconstruye si hay parte de usuario
+    const fullEmail2 = emailUserPart2 ? emailUserPart2 + (domain2 || '') : null; 
+    
+    const email = fullEmail1; 
+
+    // 💥 2. CONVERSIÓN DE FECHAS AL FORMATO DE LA BASE DE DATOS
+    const dbVencimientoDPI = convertDateToDBFormat(vencimientoDPI);
+    const dbVencimientoLicencia = convertDateToDBFormat(vencimientoLicencia);
+
+    // 3. Variables de Auditoría
     const now = new Date();
     const fechaAlta = now.toISOString().split('T')[0]; // YYYY-MM-DD
     const horaAlta = now.toLocaleTimeString('en-US', { hour12: false }); // HH:MM:SS
-    
-    // 💡 Usamos 0 como valor temporal, ya que es INTEGER
     const userNewData = 0; 
     
-    // 🔑 CONSTANTES DE SISTEMA
     const ID_PERFIL_CONDUCTOR = 3; 
-    const ESTADO_INACTIVO = 0; // 💡 0: Inactivo (No logueado)
+    const ESTADO_INACTIVO = 0; 
 
     try {
-        // 2. VERIFICAR si el email ya existe en la tabla PERSONAS (CORREO1)
+        // 4. VERIFICAR si el email ya existe en la tabla PERSONAS (CORREO1)
         const existingPerson = await User.findOne({ 
             where: { CORREO1: email },
             attributes: ['ID_PERSO'] 
@@ -44,40 +62,42 @@ exports.registerDriver = async (req, res) => {
             return res.status(409).json({ message: 'El Email Principal ya está registrado en el sistema.' });
         }
         
-        // 3. CREACIÓN del registro en la tabla PERSONAS (MySQL)
+        // 5. CREACIÓN del registro en la tabla PERSONAS (MySQL)
         const newPerson = await User.create({
-            nombres, apellidos, dpi, vencimientoDPI, licencia, vencimientoLicencia, 
-            nit, fechaNacimiento, telefono, celular, numeralDireccion, 
+            nombres, apellidos, dpi, 
+            vencimientoDPI: dbVencimientoDPI, // 💥 Usamos el formato DB
+            licencia, 
+            vencimientoLicencia: dbVencimientoLicencia, // 💥 Usamos el formato DB
+            // 💡 NIT y Teléfono Fijo se permiten nulos/vacíos si el frontend no los envía
+            nit: nit || null, 
+            fechaNacimiento, 
+            telefono: telefono || null, 
+            celular, numeralDireccion, 
             zonaDireccion, coloniaDireccion, departamentoDireccion, municipioDireccion,
-            email1: email1,
-            email2: email2,
+            email1: fullEmail1, // 💥 Usamos el email reconstruido
+            email2: fullEmail2, // 💥 Usamos el email reconstruido (puede ser null)
             FECHA_ALTA: fechaAlta, 
             HORA_ALTA: horaAlta,
-            // 💡 Ahora enviamos el INTEGER 0
             USER_NEW_DATA: userNewData,
         });
 
-        // 4. OBTENER la llave primaria (ID_PERSO)
         const idPerso = newPerson.ID_PERSO; 
 
-        // 5. Hash de la Contraseña y CREACIÓN del registro en la tabla USUARIOS (MySQL)
+        // 6. CREACIÓN del registro en la tabla USUARIOS (MySQL)
         const hashedPassword = await bcrypt.hash(password, 10);
         
         await Usuario.create({
             ID_PERSO: idPerso,
             ID_PER: ID_PERFIL_CONDUCTOR, 
-            // 💥 CORRECCIÓN CRÍTICA: Ahora enviamos el INTEGER 0
             ESTADO: ESTADO_INACTIVO, 
-            USUARIO: email, 
+            USUARIO: fullEmail1, 
             PASSWORD: hashedPassword,
             FECHA_ALTA: fechaAlta,
             HORA_ALTA: horaAlta,
-            // 💡 Enviamos el INTEGER 0
             USER_NEW_DATA: userNewData
-        });
-
-        // 6. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
-        // 💡 Asumo que el modelo Driver.js está mapeado correctamente a CONDUCTORES
+        });       
+        
+        // 7. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
         await Driver.create({
             ID_PERSO: idPerso, 
             UBICACION_LAT: null, 
@@ -85,52 +105,35 @@ exports.registerDriver = async (req, res) => {
             STATUS: 'pendiente_aprobacion', 
             IS_ONLINE: false,
         });
-
-        // 7. Respuesta exitosa
+        
         res.status(201).json({ 
             message: 'Registro de conductor exitoso. Sus datos están pendientes de aprobación.' 
         });
 
     } catch (error) {
         console.error('Error en Registro de Conductor:', error);
-        // 💡 Podemos agregar lógica para eliminar el registro de PERSONAS si falla USUARIOS, 
-        // pero por ahora solo devolvemos el error.
         res.status(500).json({ message: 'Error interno al procesar el registro.' });
     }
 };
-
-// ... (El resto de funciones, loginDriver y updateStatus, se mantienen sin cambios)
-// =========================================================================
-// FUNCIÓN DE LOGIN (exports.loginDriver)
-// ...
-// =========================================================================
 
 exports.loginDriver = async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // La búsqueda en USUARIOS es correcta porque esa tabla SÍ tiene PASSWORD
         const userCredentials = await Usuario.findOne({ where: { USUARIO: email } }); 
-
         if (!userCredentials || !bcrypt.compareSync(password, userCredentials.PASSWORD)) {
             return res.status(401).json({ message: 'Credenciales inválidas.' });
         }
-
-        const ID_PERSO_USER = userCredentials.ID_PERSO; 
-        
+        const ID_PERSO_USER = userCredentials.ID_PERSO;         
         const driver = await Driver.findOne({ where: { ID_PERSO: ID_PERSO_USER } });
         if (!driver) {
             return res.status(403).json({ message: 'Usuario no es un conductor registrado o no tiene registro activo.' });
         }
-
-        // 💡 El token debe usar el ID_PERSO como identificador principal si es la FK
         const token = jwt.sign(
             { userId: ID_PERSO_USER, driverId: driver.ID_COND, role: 'driver' }, 
             process.env.JWT_SECRET, 
             { expiresIn: '1d' }
         );
-
-        // 💡 ACTIVA el estado en USUARIOS después del login
         await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: ID_PERSO_USER } }); 
         
         res.json({ token, driver });
@@ -140,13 +143,9 @@ exports.loginDriver = async (req, res) => {
     }
 };
 
-// Función para Actualizar el Estado del Conductor
 exports.updateStatus = async (req, res) => {
-    // ... (El resto de la función se mantiene)
     const { driverId } = req.user; 
     const { status } = req.body; 
-    
-    // ... (validación de status y lógica de actualización) ...
 
     if (!['disponible', 'no_disponible'].includes(status)) {
         return res.status(400).json({ message: 'Estado no válido.' });
