@@ -1,5 +1,3 @@
-// /app/models/Usuario.js
-
 const { DataTypes } = require('sequelize');
 
 // Usamos la conexión de MySQL
@@ -25,11 +23,12 @@ const Usuario = sequelizeMySQL.define('Usuario', {
         allowNull: false,
         field: 'ID_PER',
     },
-    // ESTADO
+    // 💥 CORRECCIÓN CRÍTICA: ESTADO debe ser INTEGER para aceptar 0/1
     ESTADO: {
-        type: DataTypes.STRING,
+        type: DataTypes.INTEGER, // ¡Cambiado de STRING a INTEGER!
         allowNull: false,
         field: 'ESTADO',
+        defaultValue: 0, // Por defecto al crear: Inactivo (0)
     },
     // CREDENCIALES
     USUARIO: {
@@ -52,8 +51,9 @@ const Usuario = sequelizeMySQL.define('Usuario', {
         type: DataTypes.TIME,
         field: 'HORA_ALTA',
     },
+    // 💡 Tipo cambiado a INTEGER, ya que guarda una referencia ID_PERSO
     USER_NEW_DATA: {
-        type: DataTypes.STRING,
+        type: DataTypes.INTEGER, 
         field: 'USER_NEW_DATA',
     },
 }, {
