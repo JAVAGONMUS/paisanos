@@ -7,7 +7,6 @@ require('dotenv').config();
 
 // =========================================================================
 // FUNCIÓN DE REGISTRO (exports.registerDriver)
-// * Corregida para INSERCIÓN en PERSONAS, USUARIOS y CONDUCTORES.
 // =========================================================================
 
 exports.registerDriver = async (req, res) => {
@@ -19,20 +18,26 @@ exports.registerDriver = async (req, res) => {
         departamentoDireccion, municipioDireccion, email1, email2, password 
     } = req.body;
     
-    // Asignación de variables de auditoría y clave
+    // --- VARIABLES DE AUDITORÍA Y CLAVE ---
     const email = email1; 
-    const fechaAlta = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const horaAlta = new Date().toTimeString().split(' ')[0]; // HH:MM:SS
-    const userNewData = 'sistema_registro_app'; 
-    const ID_PERFIL_CONDUCTOR = 3; // ⚠️ ASUMIMOS que el ID del perfil 'Conductor' es 3
+    
+    // 💡 Valores de fecha y hora actuales en formato MySQL
+    const now = new Date();
+    const fechaAlta = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const horaAlta = now.toLocaleTimeString('en-US', { hour12: false }); // HH:MM:SS
+    
+    // 💡 Usamos 0 como valor temporal, ya que es INTEGER
+    const userNewData = 0; 
+    
+    // 🔑 CONSTANTES DE SISTEMA
+    const ID_PERFIL_CONDUCTOR = 3; 
+    const ESTADO_INACTIVO = 0; // 💡 0: Inactivo (No logueado)
 
     try {
         // 2. VERIFICAR si el email ya existe en la tabla PERSONAS (CORREO1)
-        // 🔑 AJUSTE CLAVE: Usamos 'attributes' para seleccionar SÓLO ID_PERSO.
-        // Esto evita que Sequelize intente seleccionar campos inexistentes como 'PASSWORD'.
         const existingPerson = await User.findOne({ 
             where: { CORREO1: email },
-            attributes: ['ID_PERSO'] // Solo necesitamos saber si existe
+            attributes: ['ID_PERSO'] 
         });
         
         if (existingPerson) {
@@ -40,28 +45,16 @@ exports.registerDriver = async (req, res) => {
         }
         
         // 3. CREACIÓN del registro en la tabla PERSONAS (MySQL)
-        // Este bloque ya fue revisado para NO incluir 'password'
         const newPerson = await User.create({
-            nombres, 
-            apellidos, 
-            dpi, 
-            vencimientoDPI, 
-            licencia, 
-            vencimientoLicencia, 
-            nit, 
-            fechaNacimiento,
-            telefono, 
-            celular, 
-            numeralDireccion, 
-            zonaDireccion, 
-            coloniaDireccion,
-            departamentoDireccion,
-            municipioDireccion,
+            nombres, apellidos, dpi, vencimientoDPI, licencia, vencimientoLicencia, 
+            nit, fechaNacimiento, telefono, celular, numeralDireccion, 
+            zonaDireccion, coloniaDireccion, departamentoDireccion, municipioDireccion,
             email1: email1,
             email2: email2,
             FECHA_ALTA: fechaAlta, 
             HORA_ALTA: horaAlta,
-            userNewData,
+            // 💡 Ahora enviamos el INTEGER 0
+            USER_NEW_DATA: userNewData,
         });
 
         // 4. OBTENER la llave primaria (ID_PERSO)
@@ -73,15 +66,18 @@ exports.registerDriver = async (req, res) => {
         await Usuario.create({
             ID_PERSO: idPerso,
             ID_PER: ID_PERFIL_CONDUCTOR, 
-            ESTADO: 'ACTIVO', 
+            // 💥 CORRECCIÓN CRÍTICA: Ahora enviamos el INTEGER 0
+            ESTADO: ESTADO_INACTIVO, 
             USUARIO: email, 
             PASSWORD: hashedPassword,
             FECHA_ALTA: fechaAlta,
             HORA_ALTA: horaAlta,
+            // 💡 Enviamos el INTEGER 0
             USER_NEW_DATA: userNewData
         });
 
         // 6. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
+        // 💡 Asumo que el modelo Driver.js está mapeado correctamente a CONDUCTORES
         await Driver.create({
             ID_PERSO: idPerso, 
             UBICACION_LAT: null, 
@@ -97,13 +93,16 @@ exports.registerDriver = async (req, res) => {
 
     } catch (error) {
         console.error('Error en Registro de Conductor:', error);
+        // 💡 Podemos agregar lógica para eliminar el registro de PERSONAS si falla USUARIOS, 
+        // pero por ahora solo devolvemos el error.
         res.status(500).json({ message: 'Error interno al procesar el registro.' });
     }
 };
 
+// ... (El resto de funciones, loginDriver y updateStatus, se mantienen sin cambios)
 // =========================================================================
 // FUNCIÓN DE LOGIN (exports.loginDriver)
-// * Corregida para buscar credenciales en USUARIOS y la llave ID_PERSO en PERSONAS.
+// ...
 // =========================================================================
 
 exports.loginDriver = async (req, res) => {
@@ -124,11 +123,15 @@ exports.loginDriver = async (req, res) => {
             return res.status(403).json({ message: 'Usuario no es un conductor registrado o no tiene registro activo.' });
         }
 
+        // 💡 El token debe usar el ID_PERSO como identificador principal si es la FK
         const token = jwt.sign(
             { userId: ID_PERSO_USER, driverId: driver.ID_COND, role: 'driver' }, 
             process.env.JWT_SECRET, 
             { expiresIn: '1d' }
         );
+
+        // 💡 ACTIVA el estado en USUARIOS después del login
+        await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: ID_PERSO_USER } }); 
         
         res.json({ token, driver });
     } catch (error) {
@@ -139,9 +142,11 @@ exports.loginDriver = async (req, res) => {
 
 // Función para Actualizar el Estado del Conductor
 exports.updateStatus = async (req, res) => {
-    // ... (Esta función no necesita cambios si usa ID_COND de la tabla CONDUCTORES)
+    // ... (El resto de la función se mantiene)
     const { driverId } = req.user; 
-    const { status } = req.body; // 'disponible' o 'no_disponible'
+    const { status } = req.body; 
+    
+    // ... (validación de status y lógica de actualización) ...
 
     if (!['disponible', 'no_disponible'].includes(status)) {
         return res.status(400).json({ message: 'Estado no válido.' });
