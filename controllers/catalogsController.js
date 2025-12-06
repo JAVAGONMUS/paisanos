@@ -1,28 +1,32 @@
 const Dominio = require('../models/Dominio');
 
 /**
- * Obtiene la lista de dominios de correo electrónico permitidos.
+ * Obtiene la lista de dominios de correo electrónico disponibles 
+ * desde la tabla DOMINIOS y los formatea para ser utilizados en un select (label/value).
+ * @param {object} req - Objeto de solicitud de Express.
+ * @param {object} res - Objeto de respuesta de Express.
  */
 exports.getDomains = async (req, res) => {
     try {
+        // 1. Buscar todos los dominios
         const dominios = await Dominio.findAll({
-            attributes: ['ID_DOM', 'NOMBRE_DOMINIO']
+            // Seleccionar solo los campos necesarios para el catálogo
+            attributes: ['ID_DOM', 'NOMBRE'],
+            // Opcional: ordenar por nombre para mejor usabilidad
+            order: [['NOMBRE', 'ASC']]
         });
         
-        // Mapeamos para el formato que espera el Dropdown de React Native
+        // 2. Formatear los datos a { label: 'nombre', value: 'nombre' }
         const formattedDomains = dominios.map(d => ({
-            label: d.NOMBRE_DOMINIO,
-            value: d.NOMBRE_DOMINIO // Enviamos el string del dominio como valor
+            label: d.NOMBRE,
+            value: d.NOMBRE // El valor es el nombre completo del dominio
         }));
 
+        // 3. Responder con el catálogo
         res.status(200).json(formattedDomains);
     } catch (error) {
-        console.error('Error al obtener dominios:', error);
+        // 4. Manejar errores de base de datos o internos
+        console.error('Error al obtener catálogo de dominios:', error);
         res.status(500).json({ message: 'Error interno al cargar la lista de dominios.' });
     }
 };
-
-/**
- * Nota: Asume que esta función se agregará a tu archivo de rutas (e.g., server/routes/catalogs.js o server/routes/index.js)
- * con un endpoint como GET /api/dominios.
- */
