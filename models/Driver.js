@@ -4,95 +4,94 @@ const { sequelizePostgres } = require('../config/databases');
 
 // Definición del modelo para la tabla CONDUCTORES en PostgreSQL
 const Driver = sequelizePostgres.define('Driver', {
-    // LLAVE PRIMARIA: ID_COND
+    // 1. ID_COND (LLAVE PRIMARIA)
     ID_COND: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         field: 'ID_COND',
     },
-    // LLAVE FORÁNEA: ID_PERSO
+    // 2. ID_PERSO (LLAVE FORÁNEA PERSONAS)
     ID_PERSO: {
         type: DataTypes.INTEGER,
         allowNull: false,
         field: 'ID_PERSO',
         unique: true,
     },
-    // LLAVE FORÁNEA: ID_VEH (Nuevo campo)
+    // 3. ID_VEH (LLAVE FORÁNEA VEHICULOS)
     ID_VEH: {
         type: DataTypes.INTEGER,
         allowNull: true, 
         field: 'ID_VEH',
     },
-    // Ubicación
+    // 4. UBICACION_LAT
     UBICACION_LAT: {
         type: DataTypes.DECIMAL(10, 7),
         allowNull: true,
         field: 'UBICACION_LAT',
     },
+    // 5. UBICACION_LON
     UBICACION_LON: {
         type: DataTypes.DECIMAL(10, 7),
         allowNull: true,
         field: 'UBICACION_LON',
     },
-    // STATUS (0 por defecto, Integer para control booleano/estado de aprobación)
+    // 6. STATUS (BOOLEAN: false por defecto. Indica si el conductor está aprobado para operar)
     STATUS: {
-        type: DataTypes.INTEGER,
+        type: DataTypes.BOOLEAN, // <-- CORRECCIÓN: Tipo BOOLEAN
         allowNull: false,
         field: 'STATUS',
-        defaultValue: 0, // 0 = Inactivo/Pendiente
+        defaultValue: false, // <-- CORRECCIÓN: Valor FALSE por defecto
     },
-    // BEARING (Nuevo campo)
+    // 7. BEARING
     BEARING: {
         type: DataTypes.FLOAT,
         allowNull: true,
         field: 'BEARING',
     },
-    // VELOCIDAD (Nuevo campo)
+    // 8. VELOCIDAD
     VELOCIDAD: {
         type: DataTypes.FLOAT,
         allowNull: true,
         field: 'VELOCIDAD',
     },
-    // LAST_UPDATED (Nuevo campo)
+    // 9. LAST_UPDATED
     LAST_UPDATED: {
         type: DataTypes.DATE,
         allowNull: true,
         field: 'LAST_UPDATED',
     },
-    // IS_ONLINE (Nuevo campo - para disponibilidad inmediata)
+    // 10. IS_ONLINE (BOOLEAN: false por defecto. Indica si está conectado/disponible)
     IS_ONLINE: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
         field: 'IS_ONLINE',
         defaultValue: false,
     },
-    // PUNTAJE (Nuevo campo)
+    // 11. PUNTAJE
     PUNTAJE: {
         type: DataTypes.INTEGER,
         allowNull: true,
         field: 'PUNTAJE',
     },
-    // COMENTARIOS (Nuevo campo)
+    // 12. COMENTARIOS
     COMENTARIOS: {
         type: DataTypes.TEXT,
         allowNull: true,
         field: 'COMENTARIOS',
     },
-    // VIAJES (Nuevo campo)
+    // 13. VIAJES
     VIAJES: {
         type: DataTypes.INTEGER,
         allowNull: true,
         field: 'VIAJES',
     },
-    // CREATED_AT y UPDATED_AT se manejan automáticamente si timestamps es true
-    // y se mapean con los nombres especificados.
-
+    // 14. CREATED_AT, 15. UPDATED_AT se configuran en el objeto de opciones
 }, {
     tableName: 'CONDUCTORES',
     timestamps: true, 
     createdAt: 'CREATED_AT',
-    updatedAt: 'UPDATED_AT',
+    updatedAt: 'UPDATED_AT', // Mapea a UPDATED_AT
     freezeTableName: true,
 });
 
