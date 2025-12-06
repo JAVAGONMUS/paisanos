@@ -15,12 +15,14 @@ exports.getDomains = async (req, res) => {
             // Opcional: ordenar por nombre para mejor usabilidad
             order: [['NOMBRE', 'ASC']]
         });
+        console.log('DOMINIOS ENCONTRADOS:', dominios.length); // ⬅️ Añade esto
         
         // 2. Formatear los datos a { label: 'nombre', value: 'nombre' }
         const formattedDomains = dominios.map(d => ({
             label: d.NOMBRE,
             value: d.NOMBRE // El valor es el nombre completo del dominio
         }));
+        console.log('DOMINIOS FORMATEADOS (Primeros 2):', formattedDomains.slice(0, 2)); // ⬅️ Añade esto
 
         // 3. Responder con el catálogo
         res.status(200).json(formattedDomains);
