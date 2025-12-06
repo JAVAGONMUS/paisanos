@@ -6,53 +6,59 @@ const Usuario = require('../models/Usuario'); // Tabla USUARIOS (MySQL)
 require('dotenv').config();
 
 // =========================================================================
-// FUNCIÓN AUXILIAR: Conversión de Fecha
-// Convierte el formato de usuario DD/MM/AAAA a formato DB AAAA-MM-DD
+// FUNCIÓN AUXILIAR: Conversión de Fecha (Asumiendo formato DD/MM/AAAA)
 // =========================================================================
 const convertDateToDBFormat = (dateString) => {
-    if (!dateString) return null;
-    const parts = dateString.split('/'); // dd/mm/aaaa
-    if (parts.length !== 3) return null;
-    return `${parts[2]}-${parts[1]}-${parts[0]}`; // aaaa-mm-dd
+    if (!dateString || dateString.trim() === '') return null; 
+    
+    // Quitar barras para procesar solo los 8 dígitos
+    const cleanDate = dateString.replace(/\//g, ''); 
+    
+    if (cleanDate.length === 8) {
+        const dd = cleanDate.substring(0, 2);
+        const mm = cleanDate.substring(2, 4);
+        const aaaa = cleanDate.substring(4, 8);
+        return `${aaaa}-${mm}-${dd}`; // Formato ISO aaaa-mm-dd
+    }
+    return null; 
 };
 
 
 exports.registerDriver = async (req, res) => {
-    // 1. Obtener datos del formulario, incluyendo los nuevos campos de email
+    // 1. Obtener datos del formulario, incluyendo las partes del email
     const { 
         nombres, apellidos, dpi, vencimientoDPI, licencia, 
         vencimientoLicencia, nit, fechaNacimiento, telefono, 
         celular, numeralDireccion, zonaDireccion, coloniaDireccion,
         departamentoDireccion, municipioDireccion, 
-        emailUserPart1, domain1, // Nuevo: Email Principal
-        emailUserPart2, domain2, // Nuevo: Email Secundario
+        emailUserPart1, domain1, // Email Principal
+        emailUserPart2, domain2, // Email Secundario
         password 
     } = req.body;
     
     // --- PREPARACIÓN DE DATOS ---
     
-    // 💥 1. RECONSTRUCCIÓN DE EMAILS
-    const fullEmail1 = emailUserPart1 + (domain1 || ''); // Requerido
-    // El email secundario es opcional, solo se reconstruye si hay parte de usuario
+    // 1. RECONSTRUCCIÓN DE EMAILS
+    const fullEmail1 = emailUserPart1 + (domain1 || ''); 
     const fullEmail2 = emailUserPart2 ? emailUserPart2 + (domain2 || '') : null; 
     
     const email = fullEmail1; 
 
-    // 💥 2. CONVERSIÓN DE FECHAS AL FORMATO DE LA BASE DE DATOS
+    // 2. CONVERSIÓN DE FECHAS AL FORMATO DE LA BASE DE DATOS
     const dbVencimientoDPI = convertDateToDBFormat(vencimientoDPI);
     const dbVencimientoLicencia = convertDateToDBFormat(vencimientoLicencia);
 
     // 3. Variables de Auditoría
     const now = new Date();
-    const fechaAlta = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const horaAlta = now.toLocaleTimeString('en-US', { hour12: false }); // HH:MM:SS
+    const fechaAlta = now.toISOString().split('T')[0];
+    const horaAlta = now.toLocaleTimeString('en-US', { hour12: false });
     const userNewData = 0; 
     
     const ID_PERFIL_CONDUCTOR = 3; 
-    const ESTADO_INACTIVO = 0; 
+    const ESTADO_INACTIVO = 0; // Para la tabla de USUARIOS (MySQL)
 
     try {
-        // 4. VERIFICAR si el email ya existe en la tabla PERSONAS (CORREO1)
+        // 4. VERIFICAR si ya existe
         const existingPerson = await User.findOne({ 
             where: { CORREO1: email },
             attributes: ['ID_PERSO'] 
@@ -65,17 +71,16 @@ exports.registerDriver = async (req, res) => {
         // 5. CREACIÓN del registro en la tabla PERSONAS (MySQL)
         const newPerson = await User.create({
             nombres, apellidos, dpi, 
-            vencimientoDPI: dbVencimientoDPI, // 💥 Usamos el formato DB
+            vencimientoDPI: dbVencimientoDPI, 
             licencia, 
-            vencimientoLicencia: dbVencimientoLicencia, // 💥 Usamos el formato DB
-            // 💡 NIT y Teléfono Fijo se permiten nulos/vacíos si el frontend no los envía
+            vencimientoLicencia: dbVencimientoLicencia, 
             nit: nit || null, 
             fechaNacimiento, 
             telefono: telefono || null, 
             celular, numeralDireccion, 
             zonaDireccion, coloniaDireccion, departamentoDireccion, municipioDireccion,
-            email1: fullEmail1, // 💥 Usamos el email reconstruido
-            email2: fullEmail2, // 💥 Usamos el email reconstruido (puede ser null)
+            email1: fullEmail1, 
+            email2: fullEmail2, 
             FECHA_ALTA: fechaAlta, 
             HORA_ALTA: horaAlta,
             USER_NEW_DATA: userNewData,
@@ -102,8 +107,10 @@ exports.registerDriver = async (req, res) => {
             ID_PERSO: idPerso, 
             UBICACION_LAT: null, 
             UBICACION_LON: null,
-            STATUS: 'pendiente_aprobacion', 
-            IS_ONLINE: false,
+            STATUS: false, // <-- CORRECCIÓN: Insertar valor BOOLEAN 'false'
+            ID_VEH: null,
+            IS_ONLINE: false, 
+            // Los demás campos toman su valor por defecto/nulo
         });
         
         res.status(201).json({ 
@@ -147,13 +154,16 @@ exports.updateStatus = async (req, res) => {
     const { driverId } = req.user; 
     const { status } = req.body; 
 
+    // Aquí 'status' se usa para IS_ONLINE (disponibilidad)
     if (!['disponible', 'no_disponible'].includes(status)) {
         return res.status(400).json({ message: 'Estado no válido.' });
     }
 
     try {
+        const is_online_value = status === 'disponible';
+
         const [updated] = await Driver.update(
-            { STATUS: status },
+            { IS_ONLINE: is_online_value, LAST_UPDATED: new Date() }, // Actualizar LAST_UPDATED también
             { where: { ID_COND: driverId } }
         );
 
