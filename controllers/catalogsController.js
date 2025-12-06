@@ -18,10 +18,14 @@ exports.getDomains = async (req, res) => {
         console.log('DOMINIOS ENCONTRADOS:', dominios.length); // ⬅️ Añade esto
         
         // 2. Formatear los datos a { label: 'nombre', value: 'nombre' }
-        const formattedDomains = dominios.map(d => ({
-            label: d.NOMBRE,
-            value: d.NOMBRE // El valor es el nombre completo del dominio
-        }));
+        const formattedDomains = dominios.map(d => {
+            const domainName = d.NOMBRE || d.dataValues.NOMBRE; // <- Lectura robusta
+            return {
+                label: domainName,
+                value: domainName 
+            };
+        });
+        
         console.log('DOMINIOS FORMATEADOS (Primeros 2):', formattedDomains.slice(0, 2)); // ⬅️ Añade esto
 
         // 3. Responder con el catálogo
