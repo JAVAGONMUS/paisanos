@@ -8,13 +8,7 @@ const { setupAssociations } = require('./config/associations'); // Importamos la
 
 // 💡 IMPORTAR MODELOS DE POSTGRESQL AQUÍ 
 const Driver = require('./models/Driver'); // Tabla: CONDUCTORES
-// const GpsHistory = require('./models/GpsHistory'); 
-// ... importa el resto de tus modelos PG aquí
 
-// ⚠️ NOTA: Los modelos de catálogo (Pais, Departamento, Municipio) NO SE DEBEN PONER en pgModels.
-// Se cargan implícitamente a través de sus archivos .js y luego setupAssociations los usa.
-
-// Lista de modelos de PostgreSQL a sincronizar
 const pgModels = [
     Driver,
     // ... añade el resto aquí
@@ -23,6 +17,7 @@ const pgModels = [
 // Importar rutas
 const driverRoutes = require('./routes/driverRoutes'); 
 const ubicacionRoutes = require('./routes/ubicacionRoutes'); 
+const catalogsRoutes = require('./routes/catalogsRoutes');
 const { initSocketIO } = require('./sockets/socketHandler'); 
 
 const app = express();
@@ -42,6 +37,7 @@ app.use(express.json());
 // RUTAS DE LA API
 app.use('/api/drivers', driverRoutes);
 app.use('/api', ubicacionRoutes); 
+app.use('/api/catalogs', catalogsRoutes);
 
 // Inicializar la lógica de Socket.io
 initSocketIO(io);
@@ -62,14 +58,12 @@ async function startServer() {
         await authenticateDBs(); 
         
         // 2. ESTABLECER ASOCIACIONES (MySQL): 
-        // Esta es la ÚNICA llamada a setupAssociations en toda la aplicación.
         setupAssociations();
         console.log('✅ Asociaciones de Sequelize establecidas.');
 
         // 3. Sincronizar los modelos de PostgreSQL
         console.log('Iniciando sincronización de modelos PostgreSQL...');
         for (const Model of pgModels) {
-            // Se usa { alter: true } para crear/actualizar la estructura de la tabla
             await Model.sync({ alter: true }); 
             console.log(`   * Tabla ${Model.tableName || Model.name} sincronizada.`);
         }
