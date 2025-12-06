@@ -1,3 +1,4 @@
+// models/Dominio.js
 const { DataTypes } = require('sequelize');
 const { sequelizeMySQL } = require('../config/databases'); 
 
@@ -9,7 +10,8 @@ const Dominio = sequelizeMySQL.define('Dominio', {
         autoIncrement: true,
         field: 'ID_DOM',
     },
-    NOMBRE_DOMINIO: {
+    
+    NOMBRE_DOMINIO: { 
         type: DataTypes.STRING,
         allowNull: false,
         field: 'NOMBRE', 
