@@ -5,23 +5,20 @@ exports.getDomains = async (req, res) => {
         // 1. Buscar todos los dominios
         const dominios = await Dominio.findAll({
             attributes: ['ID_DOM', 'NOMBRE'], 
-            order: [['NOMBRE_DOMINIO', 'ASC']] 
         });
-        console.log('DOMINIOS ENCONTRADOS:', dominios.length); 
+        console.log('DOMINIOS ENCONTRADOS:', dominios.length);
         
         // 2. Formatear los datos a { label: 'nombre', value: 'nombre' }
         const formattedDomains = dominios.map(d => {
-            const domainName = d.NOMBRE_DOMINIO; 
-            
+            const domainName = d.dataValues.NOMBRE;     
             return {
-                label: domainName,
+                label: domainName, 
                 value: domainName 
             };
         });
         
         console.log('DOMINIOS FORMATEADOS (Primeros 2):', formattedDomains.slice(0, 2)); 
 
-        // 3. Responder con el catálogo
         res.status(200).json(formattedDomains);
     } catch (error) {
         // 4. Manejar errores de base de datos o internos
