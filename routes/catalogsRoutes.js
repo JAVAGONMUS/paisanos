@@ -1,14 +1,12 @@
+// server/routes/catalogsRoutes.js
 const express = require('express');
 const router = express.Router();
+// Importa el controlador de catálogos
 const catalogsController = require('../controllers/catalogsController');
 
-// 1. Ruta para Ubicaciones (Departamentos y Municipios)
-// URL Frontend: /api/ubicaciones
-router.get('/ubicaciones', catalogsController.getLocations);
-
-// 2. Ruta para Dominios (Email)
-// URL Frontend: /api/dominios
-// ⚠️ ESTA ES LA RUTA QUE FALTABA Y CAUSABA EL ERROR 404
-router.get('/dominios', catalogsController.getDomains);
+// Ruta para obtener el catálogo de dominios
+// La ruta que uses aquí (por ejemplo, '/domains') se combinará con el prefijo
+// que le des en app.js/index.js (ej: /api/catalogs/domains)
+router.get('/domains', catalogsController.getDomains);
 
 module.exports = router;
