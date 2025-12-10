@@ -5,48 +5,50 @@ const User = require('../models/User');       // Tabla PERSONAS (MySQL)
 const Usuario = require('../models/Usuario'); // Tabla USUARIOS (MySQL)
 require('dotenv').config();
 
-// =========================================================================
-// FUNCIÓN AUXILIAR: Conversión de Fecha (Asumiendo formato DD/MM/AAAA)
-// =========================================================================
 const convertDateToDBFormat = (dateString) => {
-    if (!dateString || dateString.trim() === '') return null; 
+    if (!dateString || dateString.trim() === '') return null;
     
     // Quitar barras para procesar solo los 8 dígitos
-    const cleanDate = dateString.replace(/\//g, ''); 
+    const cleanDate = dateString.replace(/\//g, '');
     
     if (cleanDate.length === 8) {
+        // Se espera DD/MM/AAAA. Se extraen las partes:
         const dd = cleanDate.substring(0, 2);
         const mm = cleanDate.substring(2, 4);
         const aaaa = cleanDate.substring(4, 8);
-        return `${aaaa}-${mm}-${dd}`; // Formato ISO aaaa-mm-dd
+        return `${aaaa}-${mm}-${dd}`; // Formato ISO AAAA-MM-DD
     }
-    return null; 
+    return null;
 };
 
 
 exports.registerDriver = async (req, res) => {
-    // 1. Obtener datos del formulario, incluyendo las partes del email
+    // 1. Obtener datos del formulario.
+    // 🛑 CORRECCIÓN 3: Ajustamos la destructuración para recibir los emails ya formados (emailPart1 y emailPart2)
     const { 
         nombres, apellidos, dpi, vencimientoDPI, licencia, 
         vencimientoLicencia, nit, fechaNacimiento, telefono, 
         celular, numeralDireccion, zonaDireccion, coloniaDireccion,
         departamentoDireccion, municipioDireccion, 
-        emailUserPart1, domain1, // Email Principal
-        emailUserPart2, domain2, // Email Secundario
+        emailPart1, // Email Principal (ya incluye el @)
+        emailPart2, // Email Secundario (ya incluye el @ o es null)
         password 
     } = req.body;
     
     // --- PREPARACIÓN DE DATOS ---
     
     // 1. RECONSTRUCCIÓN DE EMAILS
-    const fullEmail1 = emailUserPart1 + (domain1 || ''); 
-    const fullEmail2 = emailUserPart2 ? emailUserPart2 + (domain2 || '') : null; 
-    
-    const email = fullEmail1; 
+    // 🛑 CORRECCIÓN 2 (Emails): Ahora usamos directamente emailPart1 y emailPart2 que ya vienen del frontend con el formato completo (user@domain.com)
+    // El email principal para validación será emailPart1.
+    const email = emailPart1; 
 
-    // 2. CONVERSIÓN DE FECHAS AL FORMATO DE LA BASE DE DATOS
+    // 2. CONVERSIÓN DE FECHAS AL FORMATO DE LA BASE DE DATOS (AAAA-MM-DD)
     const dbVencimientoDPI = convertDateToDBFormat(vencimientoDPI);
     const dbVencimientoLicencia = convertDateToDBFormat(vencimientoLicencia);
+    
+    // 🛑 CORRECCIÓN 1 (Fecha de Nacimiento): Se aplica la conversión solo si el campo existe, ya que ahora es opcional.
+    const dbFechaNacimiento = convertDateToDBFormat(fechaNacimiento);
+
 
     // 3. Variables de Auditoría
     const now = new Date();
@@ -55,12 +57,14 @@ exports.registerDriver = async (req, res) => {
     const userNewData = 0; 
     
     const ID_PERFIL_CONDUCTOR = 3; 
-    const ESTADO_INACTIVO = 0; // Para la tabla de USUARIOS (MySQL)
+    const ESTADO_INACTIVO = 0; 
 
     try {
         // 4. VERIFICAR si ya existe
         const existingPerson = await User.findOne({ 
-            where: { CORREO1: email },
+            // La columna para el email principal en tu modelo User (tabla PERSONAS) debe ser CORREO1 o similar. 
+            // Si el nombre real es diferente, ajústalo aquí. Asumo que es CORREO1, basado en la consulta findOne.
+            where: { CORREO1: email }, 
             attributes: ['ID_PERSO'] 
         });
         
@@ -75,12 +79,14 @@ exports.registerDriver = async (req, res) => {
             licencia, 
             vencimientoLicencia: dbVencimientoLicencia, 
             nit: nit || null, 
-            fechaNacimiento, 
+            // 🛑 CORRECCIÓN 1: Usar la fecha ya convertida al formato AAAA-MM-DD.
+            fechaNacimiento: dbFechaNacimiento, 
             telefono: telefono || null, 
             celular, numeralDireccion, 
             zonaDireccion, coloniaDireccion, departamentoDireccion, municipioDireccion,
-            email1: fullEmail1, 
-            email2: fullEmail2, 
+            // 🛑 CORRECCIÓN 2: Usar las variables del email completo que ya tienen el @
+            CORREO1: emailPart1, // Asumo que el campo en BD es CORREO1
+            CORREO2: emailPart2, // Asumo que el campo en BD es CORREO2
             FECHA_ALTA: fechaAlta, 
             HORA_ALTA: horaAlta,
             USER_NEW_DATA: userNewData,
@@ -95,22 +101,21 @@ exports.registerDriver = async (req, res) => {
             ID_PERSO: idPerso,
             ID_PER: ID_PERFIL_CONDUCTOR, 
             ESTADO: ESTADO_INACTIVO, 
-            USUARIO: fullEmail1, 
+            USUARIO: emailPart1, // Usar el email completo para el USUARIO
             PASSWORD: hashedPassword,
             FECHA_ALTA: fechaAlta,
             HORA_ALTA: horaAlta,
             USER_NEW_DATA: userNewData
-        });       
+        });       
         
         // 7. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
         await Driver.create({
             ID_PERSO: idPerso, 
             UBICACION_LAT: null, 
             UBICACION_LON: null,
-            STATUS: false, // <-- CORRECCIÓN: Insertar valor BOOLEAN 'false'
+            STATUS: false, 
             ID_VEH: null,
             IS_ONLINE: false, 
-            // Los demás campos toman su valor por defecto/nulo
         });
         
         res.status(201).json({ 
