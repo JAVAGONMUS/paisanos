@@ -9,7 +9,6 @@ const Vehiculo = sequelizePostgres.define('Vehiculo', {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
-        autoIncrementIdentity: true,
         field: 'ID_VEH', 
     },
     CODIGO: {
