@@ -53,6 +53,9 @@ exports.registerDriver = async (req, res) => {
     const ID_PERFIL_CONDUCTOR = 3; 
     const ESTADO_INACTIVO = 0; 
 
+    let idPerso = null;
+    let idVehiculo = null;
+
     try {
         // 4. VERIFICAR si ya existe
         const existingPerson = await User.findOne({ 
@@ -61,7 +64,7 @@ exports.registerDriver = async (req, res) => {
         });
         
         if (existingPerson) {
-            return res.status(409).json({ message: 'El Email Principal ya está registrado en el sistema.' });
+            return res.status(409).json({ message: 'EL CORREO ELECTRONICO PRINCIPAL NO SE PUEDE REGISTRAR, YA EXISTE EN EL SISTEMA.' });
         }
         
         // --- LÓGICA DE CORRECCIÓN DE FECHA DE NACIMIENTO ---
@@ -93,7 +96,7 @@ exports.registerDriver = async (req, res) => {
             USER_NEW_DATA: userNewData,
         });
 
-        const idPerso = newPerson.ID_PERSO; 
+        idPerso = newPerson.ID_PERSO; 
 
         // 6. CREACIÓN del registro en la tabla USUARIOS (MySQL)
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -107,7 +110,7 @@ exports.registerDriver = async (req, res) => {
             FECHA_ALTA: fechaAlta,
             HORA_ALTA: horaAlta,
             USER_NEW_DATA: userNewData
-        });       
+        });
         
         // 7. CREACIÓN del registro en la tabla VEHICULOS (PostgreSQL)
         const newVehiculo = await Vehiculo.create({
@@ -121,7 +124,7 @@ exports.registerDriver = async (req, res) => {
             COMENTARIOS: comentariosVehiculo || null,
         });
         
-        const idVehiculo = newVehiculo.ID_VEH;
+        idVehiculo = newVehiculo.ID_VEH;
 
         // 8. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
         await Driver.create({
@@ -139,13 +142,35 @@ exports.registerDriver = async (req, res) => {
 
     } catch (error) {
         console.error('Error en Registro de Conductor:', error);
+
+        // Si falló el paso 7 u 8 (PostgreSQL), eliminamos los registros previos de MySQL
+        if (idPerso !== null) {
+            try {
+                // Eliminar en orden: USUARIO y luego PERSONA
+                await Usuario.destroy({ where: { ID_PERSO: idPerso } });
+                await User.destroy({ where: { ID_PERSO: idPerso } });
+                console.log(`Rollback exitoso: Registros de Persona (ID:${idPerso}) y Usuario eliminados.`);
+            } catch (rollbackError) {
+                console.error(`ERROR CRÍTICO EN ROLLBACK de MySQL: No se pudo eliminar los registros huérfanos.`, rollbackError);
+            }
+        }
+        
+        // Si falló el paso 8 (CONDUCTORES), eliminamos el VEHICULO (PostgreSQL)
+        if (idVehiculo !== null) {
+             try {
+                await Vehiculo.destroy({ where: { ID_VEH: idVehiculo } });
+                console.log(`Rollback exitoso: Registro de Vehiculo (ID:${idVehiculo}) eliminado.`);
+            } catch (rollbackError) {
+                console.error(`ERROR CRÍTICO EN ROLLBACK de PostgreSQL (Vehiculo): No se pudo eliminar el registro huérfano.`, rollbackError);
+            }
+        }
         
         if (error.name === 'SequelizeValidationError') {
             const validationMessages = error.errors.map(err => err.message).join('; ');
-             return res.status(400).json({ message: `Error de Validación de Datos: ${validationMessages}` });
+             return res.status(400).json({ message: `Error de Validación de Datos: ${validationMessages}. Se realizó el rollback.` });
         }
         
-        res.status(500).json({ message: 'Error interno al procesar el registro.' });
+        res.status(500).json({ message: 'Error interno al procesar el registro. Se realizó el rollback de los datos incompletos.' });
     }
 };
 
