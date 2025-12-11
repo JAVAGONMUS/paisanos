@@ -1,8 +1,8 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const Driver = require('../models/Driver');   // Tabla CONDUCTORES (PostgreSQL)
-const User = require('../models/User');       // Tabla PERSONAS (MySQL)
-const Usuario = require('../models/Usuario'); // Tabla USUARIOS (MySQL)
+const Driver = require('../models/Driver');   
+const User = require('../models/User');       
+const Usuario = require('../models/Usuario'); 
 require('dotenv').config();
 
 const convertDateToDBFormat = (dateString) => {
@@ -12,7 +12,6 @@ const convertDateToDBFormat = (dateString) => {
     const cleanDate = dateString.replace(/\//g, '');
     
     if (cleanDate.length === 8) {
-        // Se espera DD/MM/AAAA. Se extraen las partes:
         const dd = cleanDate.substring(0, 2);
         const mm = cleanDate.substring(2, 4);
         const aaaa = cleanDate.substring(4, 8);
@@ -21,16 +20,6 @@ const convertDateToDBFormat = (dateString) => {
         return `${aaaa}-${mm}-${dd}`; 
     }
     return null;
-};
-
-const forceDateFix = (isoDate) => {
-    if (!isoDate) return null;
-    const parts = isoDate.split('-'); // parts = [AAAA, MM, DD]
-    if (parts.length === 3) {
-        // Forzamos la inversión de MM y DD para que el ORM lo corrija al revés.
-        return `${parts[0]}-${parts[2]}-${parts[1]}`; // Devuelve AAAA-DD-MM
-    }
-    return isoDate; // Retorna el original si no es válido
 };
 
 exports.registerDriver = async (req, res) => {
@@ -47,18 +36,12 @@ exports.registerDriver = async (req, res) => {
 
     // --- PREPARACIÓN DE DATOS ---
     
-    const email = emailPart1; 
+    const email = emailPart1; // Email principal completo (para USUARIO y validación)
 
     // 2. CONVERSIÓN DE FECHAS AL FORMATO DE LA BASE DE DATOS (AAAA-MM-DD)
     const dbVencimientoDPI = convertDateToDBFormat(vencimientoDPI);
     const dbVencimientoLicencia = convertDateToDBFormat(vencimientoLicencia);
-    
-    // 🛑 APLICACIÓN DE LA CORRECCIÓN FORZADA:
-    // a. Convertimos a ISO estándar (AAAA-MM-DD)
-    let dbFechaNacimiento = convertDateToDBFormat(fechaNacimiento);
-    
-    // b. Invertimos el día y el mes (Si el valor existe, ahora es AAAA-DD-MM)
-    dbFechaNacimiento = forceDateFix(dbFechaNacimiento);
+    const dbFechaNacimiento = convertDateToDBFormat(fechaNacimiento); // AAAA-MM-DD
 
     // 3. Variables de Auditoría
     const now = new Date();
@@ -70,7 +53,24 @@ exports.registerDriver = async (req, res) => {
     const ESTADO_INACTIVO = 0; 
 
     try {
-        // ... (Verificación de existencia sin cambios)
+        // 4. VERIFICAR si ya existe
+        // Usamos CORREO1 porque es el FIELD (columna) para buscar en la BD.
+        const existingPerson = await User.findOne({ 
+            where: { CORREO1: email }, 
+            attributes: ['ID_PERSO'] 
+        });
+        
+        if (existingPerson) {
+            return res.status(409).json({ message: 'El Email Principal ya está registrado en el sistema.' });
+        }
+        
+        // --- LÓGICA DE CORRECCIÓN DE FECHA DE NACIMIENTO ---
+        let fechaNacimientoCorregida = dbFechaNacimiento;
+        if (dbFechaNacimiento) {
+            const parts = dbFechaNacimiento.split('-'); // [AAAA, MM, DD]
+            // Generar AAAA-DD-MM para compensar la inversión que hace MySQL.
+            fechaNacimientoCorregida = `${parts[0]}-${parts[2]}-${parts[1]}`; 
+        }
         
         // 5. CREACIÓN del registro en la tabla PERSONAS (MySQL)
         const newPerson = await User.create({
@@ -80,14 +80,17 @@ exports.registerDriver = async (req, res) => {
             vencimientoLicencia: dbVencimientoLicencia, 
             nit: nit || null, 
             
-            // Usamos la variable forzada AAAA-DD-MM. MySQL/Sequelize la invertirá y guardará AAAA-MM-DD.
-            fechaNacimiento: dbFechaNacimiento, 
+            // 🛑 CORRECCIÓN DE FECHA: Usar la variable forzada (AAAA-DD-MM).
+            fechaNacimiento: fechaNacimientoCorregida, 
             
             telefono: telefono || null, 
             celular, numeralDireccion, 
             zonaDireccion, coloniaDireccion, departamentoDireccion, municipioDireccion,
-            CORREO1: emailPart1, 
-            CORREO2: emailPart2, 
+            
+            // 🛑 CORRECCIÓN DE EMAIL (USAR PROPIEDADES DEL MODELO DE SEQUELIZE):
+            email1: emailPart1, // Ahora se usa el nombre de la propiedad del modelo
+            email2: emailPart2 || null, // Ahora se usa el nombre de la propiedad del modelo
+            
             FECHA_ALTA: fechaAlta, 
             HORA_ALTA: horaAlta,
             USER_NEW_DATA: userNewData,
@@ -95,7 +98,29 @@ exports.registerDriver = async (req, res) => {
 
         const idPerso = newPerson.ID_PERSO; 
 
-        // ... (Pasos 6 y 7, creación de Usuario y Driver, sin cambios)
+        // 6. CREACIÓN del registro en la tabla USUARIOS (MySQL)
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        await Usuario.create({
+            ID_PERSO: idPerso,
+            ID_PER: ID_PERFIL_CONDUCTOR, 
+            ESTADO: ESTADO_INACTIVO, 
+            USUARIO: emailPart1, // Usa el email completo
+            PASSWORD: hashedPassword,
+            FECHA_ALTA: fechaAlta,
+            HORA_ALTA: horaAlta,
+            USER_NEW_DATA: userNewData
+        });       
+        
+        // 7. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
+        await Driver.create({
+            ID_PERSO: idPerso, 
+            UBICACION_LAT: null, 
+            UBICACION_LON: null,
+            STATUS: false, 
+            ID_VEH: null,
+            IS_ONLINE: false, 
+        });
         
         res.status(201).json({ 
             message: 'Registro de conductor exitoso. Sus datos están pendientes de aprobación.' 
@@ -103,6 +128,12 @@ exports.registerDriver = async (req, res) => {
 
     } catch (error) {
         console.error('Error en Registro de Conductor:', error);
+        
+        if (error.name === 'SequelizeValidationError') {
+            const validationMessages = error.errors.map(err => err.message).join('; ');
+             return res.status(400).json({ message: `Error de Validación de Datos: ${validationMessages}` });
+        }
+        
         res.status(500).json({ message: 'Error interno al procesar el registro.' });
     }
 };
