@@ -2,10 +2,10 @@
 const { DataTypes } = require('sequelize');
 
 // 🔑 Asegúrate de usar la conexión de PostgreSQL
-const { sequelizePostgreSQL } = require('../config/databases'); 
+const { sequelizePostgres } = require('../config/databases'); 
 
 // Definición del modelo para la tabla VEHICULOS en PostgreSQL
-const Vehiculo = sequelizePostgreSQL.define('Vehiculo', {
+const Vehiculo = sequelizePostgres.define('Vehiculo', {
     // ID_VEH (Llave Primaria)
     ID_VEH: {
         type: DataTypes.INTEGER,
@@ -61,5 +61,6 @@ const Vehiculo = sequelizePostgreSQL.define('Vehiculo', {
     timestamps: false, 
     freezeTableName: true,
 });
+
 
 module.exports = Vehiculo;
