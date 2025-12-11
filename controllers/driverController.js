@@ -36,12 +36,12 @@ exports.registerDriver = async (req, res) => {
 
     // --- PREPARACIÓN DE DATOS ---
     
-    const email = emailPart1; // Email principal completo (para USUARIO y validación)
+    const email = emailPart1;
 
     // 2. CONVERSIÓN DE FECHAS AL FORMATO DE LA BASE DE DATOS (AAAA-MM-DD)
     const dbVencimientoDPI = convertDateToDBFormat(vencimientoDPI);
     const dbVencimientoLicencia = convertDateToDBFormat(vencimientoLicencia);
-    const dbFechaNacimiento = convertDateToDBFormat(fechaNacimiento); // AAAA-MM-DD
+    const dbFechaNacimiento = convertDateToDBFormat(fechaNacimiento);
 
     // 3. Variables de Auditoría
     const now = new Date();
@@ -78,18 +78,16 @@ exports.registerDriver = async (req, res) => {
             vencimientoDPI: dbVencimientoDPI, 
             licencia, 
             vencimientoLicencia: dbVencimientoLicencia, 
-            nit: nit || null, 
+            nit: nit || null,
             
-            // 🛑 CORRECCIÓN DE FECHA: Usar la variable forzada (AAAA-DD-MM).
-            fechaNacimiento: fechaNacimientoCorregida, 
+            fechaNacimiento: dbFechaNacimiento,
             
             telefono: telefono || null, 
             celular, numeralDireccion, 
             zonaDireccion, coloniaDireccion, departamentoDireccion, municipioDireccion,
             
-            // 🛑 CORRECCIÓN DE EMAIL (USAR PROPIEDADES DEL MODELO DE SEQUELIZE):
-            email1: emailPart1, // Ahora se usa el nombre de la propiedad del modelo
-            email2: emailPart2 || null, // Ahora se usa el nombre de la propiedad del modelo
+            email1: emailPart1, 
+            email2: emailPart2 || null, 
             
             FECHA_ALTA: fechaAlta, 
             HORA_ALTA: horaAlta,
