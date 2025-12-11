@@ -1,26 +1,25 @@
 // ../models/Vehiculo.js
 const { DataTypes } = require('sequelize');
 
-// 🔑 Asegúrate de usar la conexión de PostgreSQL
 const { sequelizePostgres } = require('../config/databases'); 
 
-// Definición del modelo para la tabla VEHICULOS en PostgreSQL
 const Vehiculo = sequelizePostgres.define('Vehiculo', {
     // ID_VEH (Llave Primaria)
     ID_VEH: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
+        autoIncrementIdentity: true,
         field: 'ID_VEH', 
     },
     CODIGO: {
-        type: DataTypes.STRING(255), // Usar STRING(255) para character varying
+        type: DataTypes.STRING(255), 
         allowNull: true,
         field: 'CODIGO',
     },
     PLACAS: {
         type: DataTypes.STRING(255),
-        allowNull: false, // Asumimos que las placas son obligatorias
+        allowNull: false, 
         field: 'PLACAS',
     },
     // El tipo ENUM en PostgreSQL debe definirse o Sequelize debe mapearlo como STRING.
@@ -36,10 +35,10 @@ const Vehiculo = sequelizePostgres.define('Vehiculo', {
         field: 'COLOR',
     },
     ESTADO: {
-        type: DataTypes.INTEGER, // Asumimos un estado inicial (ej. 0: Inactivo/Pendiente)
+        type: DataTypes.INTEGER, 
         allowNull: false,
         field: 'ESTADO',
-        defaultValue: 0, // Por defecto al registrar
+        defaultValue: 0, 
     },
     ASEGURADORA: {
         type: DataTypes.STRING(255),
@@ -61,6 +60,5 @@ const Vehiculo = sequelizePostgres.define('Vehiculo', {
     timestamps: false, 
     freezeTableName: true,
 });
-
 
 module.exports = Vehiculo;
