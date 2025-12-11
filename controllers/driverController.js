@@ -3,12 +3,12 @@ const bcrypt = require('bcryptjs');
 const Driver = require('../models/Driver');   
 const User = require('../models/User');       
 const Usuario = require('../models/Usuario'); 
+const Vehiculo = require('../models/Vehiculo');
 require('dotenv').config();
 
 const convertDateToDBFormat = (dateString) => {
     if (!dateString || dateString.trim() === '') return null;
     
-    // Quitar barras para procesar solo los 8 dígitos
     const cleanDate = dateString.replace(/\//g, '');
     
     if (cleanDate.length === 8) {
@@ -16,7 +16,6 @@ const convertDateToDBFormat = (dateString) => {
         const mm = cleanDate.substring(2, 4);
         const aaaa = cleanDate.substring(4, 8);
         
-        // Retorna formato ISO: AAAA-MM-DD
         return `${aaaa}-${mm}-${dd}`; 
     }
     return null;
@@ -31,7 +30,9 @@ exports.registerDriver = async (req, res) => {
         departamentoDireccion, municipioDireccion, 
         emailPart1, 
         emailPart2, 
-        password 
+        password,
+        codigoVehiculo, placasVehiculo, tipoVehiculo, colorVehiculo, 
+        aseguradoraVehiculo, idSeguroVehiculo, comentariosVehiculo
     } = req.body;
 
     // --- PREPARACIÓN DE DATOS ---
@@ -54,7 +55,6 @@ exports.registerDriver = async (req, res) => {
 
     try {
         // 4. VERIFICAR si ya existe
-        // Usamos CORREO1 porque es el FIELD (columna) para buscar en la BD.
         const existingPerson = await User.findOne({ 
             where: { CORREO1: email }, 
             attributes: ['ID_PERSO'] 
@@ -67,8 +67,7 @@ exports.registerDriver = async (req, res) => {
         // --- LÓGICA DE CORRECCIÓN DE FECHA DE NACIMIENTO ---
         let fechaNacimientoCorregida = dbFechaNacimiento;
         if (dbFechaNacimiento) {
-            const parts = dbFechaNacimiento.split('-'); // [AAAA, MM, DD]
-            // Generar AAAA-DD-MM para compensar la inversión que hace MySQL.
+            const parts = dbFechaNacimiento.split('-'); 
             fechaNacimientoCorregida = `${parts[0]}-${parts[2]}-${parts[1]}`; 
         }
         
@@ -103,20 +102,34 @@ exports.registerDriver = async (req, res) => {
             ID_PERSO: idPerso,
             ID_PER: ID_PERFIL_CONDUCTOR, 
             ESTADO: ESTADO_INACTIVO, 
-            USUARIO: emailPart1, // Usa el email completo
+            USUARIO: emailPart1, 
             PASSWORD: hashedPassword,
             FECHA_ALTA: fechaAlta,
             HORA_ALTA: horaAlta,
             USER_NEW_DATA: userNewData
         });       
         
-        // 7. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
+        // 7. CREACIÓN del registro en la tabla VEHICULOS (PostgreSQL)
+        const newVehiculo = await Vehiculo.create({
+            CODIGO: codigoVehiculo || null,
+            PLACAS: placasVehiculo,
+            TIPO: tipoVehiculo,
+            COLOR: colorVehiculo,
+            ESTADO: 0, // Estado inicial 0
+            ASEGURADORA: aseguradoraVehiculo || null,
+            ID_SEGURO: idSeguroVehiculo || null,
+            COMENTARIOS: comentariosVehiculo || null,
+        });
+        
+        const idVehiculo = newVehiculo.ID_VEH;
+
+        // 8. CREAR el registro en la tabla CONDUCTORES (PostgreSQL)
         await Driver.create({
             ID_PERSO: idPerso, 
             UBICACION_LAT: null, 
             UBICACION_LON: null,
             STATUS: false, 
-            ID_VEH: null,
+            ID_VEH: idVehiculo,
             IS_ONLINE: false, 
         });
         
@@ -167,7 +180,6 @@ exports.updateStatus = async (req, res) => {
     const { driverId } = req.user; 
     const { status } = req.body; 
 
-    // Aquí 'status' se usa para IS_ONLINE (disponibilidad)
     if (!['disponible', 'no_disponible'].includes(status)) {
         return res.status(400).json({ message: 'Estado no válido.' });
     }
@@ -176,7 +188,7 @@ exports.updateStatus = async (req, res) => {
         const is_online_value = status === 'disponible';
 
         const [updated] = await Driver.update(
-            { IS_ONLINE: is_online_value, LAST_UPDATED: new Date() }, // Actualizar LAST_UPDATED también
+            { IS_ONLINE: is_online_value, LAST_UPDATED: new Date() }, 
             { where: { ID_COND: driverId } }
         );
 
