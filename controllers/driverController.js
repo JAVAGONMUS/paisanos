@@ -214,13 +214,13 @@ exports.loginDriver = async (req, res) => {
         
         if (!driver || (driver.STATUS !== true && driver.STATUS !== 1)) {
             return res.status(403).json({ 
-                message: 'El conductor no ha sido autorizado, no tiene permitido iniciar sesión.' 
+                message: 'El conductor no ha sido autorizado. Consulte con Administracion' 
             });
         }
 
         // --- 💡 NUEVA LÓGICA: VERIFICAR VEHÍCULO Y SU ESTADO ---
         if (!driver.ID_VEH) {
-            return res.status(403).json({ message: 'El conductor no tiene un vehículo asignado.' });
+            return res.status(403).json({ message: 'El conductor no tiene un vehículo asignado. Consulte con soporte tecnico' });
         }
 
         const vehiculo = await Vehiculo.findByPk(driver.ID_VEH);
@@ -228,7 +228,7 @@ exports.loginDriver = async (req, res) => {
         // REGLA 4: Verificar que el vehículo esté activo (ESTADO === 1)
         if (!vehiculo || vehiculo.ESTADO !== 1) {
             return res.status(403).json({ 
-                message: 'El vehículo asignado no se encuentra activo o habilitado por administración.' 
+                message: 'Su vehículo asignado no se encuentra esta habilitado. Consulte con Administracion' 
             });
         }
 
@@ -248,7 +248,7 @@ exports.loginDriver = async (req, res) => {
         
         // Devolvemos respuesta exitosa con la data del vehículo
         res.json({ 
-            message: 'Login exitoso',
+            message: 'Inicio de sesión correcto.',
             token, 
             driver: {
                 id: driver.ID_COND,
