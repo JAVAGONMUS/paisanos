@@ -190,38 +190,23 @@ exports.checkUsername = async (req, res) => {
 };
 
 exports.loginDriver = async (req, res) => {
+    // Usamos 'username' para coincidir con el campo de tu App
     const { username, password } = req.body; 
-
-    // --- LOG DE ENTRADA ---
-    console.log("=== INICIO DE INTENTO DE LOGIN ===");
-    console.log("Usuario recibido del App:", username);
-    console.log("Password recibido del App:", password);
 
     try {
         // 1. BUSCAR CREDENCIALES (MySQL)
         const userCredentials = await Usuario.findOne({ where: { USUARIO: username } }); 
         
-        if (!userCredentials) {
-            console.log("Resultado: El usuario NO existe en MySQL.");
-            return res.status(401).json({ message: 'Datos incorrectos!' });
-        }
-
-        // --- PRUEBA DE BCRYPT ---
-        const isMatch = bcrypt.compareSync(password, userCredentials.PASSWORD);
-        
-        console.log("--- DEBUG DE CONTRASEÑA ---");
-        console.log("Hash en Base de Datos:", userCredentials.PASSWORD);
-        console.log("¿La contraseña coincide con el Hash?:", isMatch);
-        console.log("---------------------------");
-
-        if (!isMatch) {
-            return res.status(401).json({ message: 'Datos incorrectos!' });
+        // REGLA 1: Verificar si existe el usuario y si la contraseña coincide
+        if (!userCredentials || !bcrypt.compareSync(password, userCredentials.PASSWORD)) {
+            return res.status(401).json({ 
+                message: 'Datos incorrectos!' 
+            });
         }
 
         // REGLA 2: Verificar ESTADO de sesión (MySQL)
-        console.log("Estado de sesión actual en MySQL:", userCredentials.ESTADO);
+        // Si es diferente de 0, asumimos sesión activa o cierre incorrecto
         if (userCredentials.ESTADO !== 0) {
-            console.log("Bloqueado: El usuario tiene una sesión activa (ESTADO != 0).");
             return res.status(403).json({ 
                 message: 'El conductor debe consultar a soporte tecnico' 
             });
@@ -232,31 +217,26 @@ exports.loginDriver = async (req, res) => {
         // REGLA 3: Verificar STATUS administrativo (PostgreSQL)
         const driver = await Driver.findOne({ where: { ID_PERSO: ID_PERSO_USER } });
         
-        if (!driver) {
-            console.log("Error: El usuario existe en MySQL pero no tiene registro en la tabla CONDUCTORES de Postgres.");
-            return res.status(403).json({ message: 'Error de vinculación de conductor.' });
-        }
-
-        console.log("Status Administrativo (Postgres):", driver.STATUS);
-        if (driver.STATUS !== true && driver.STATUS !== 1) {
-            console.log("Bloqueado: El conductor tiene STATUS = false/0.");
+        // Verificamos que exista el registro y que STATUS sea 1 (true)
+        if (!driver || driver.STATUS !== true && driver.STATUS !== 1) {
             return res.status(403).json({ 
                 message: 'El conductor no ha sido autorizado, no tiene permitido iniciar sesión.' 
             });
         }
 
-        // --- TODO CORRECTO ---
+        // --- TODO CORRECTO: PROCEDER AL LOGIN ---
+        
+        // Generar Token
         const token = jwt.sign(
             { userId: ID_PERSO_USER, driverId: driver.ID_COND, role: 'driver' }, 
             process.env.JWT_SECRET, 
             { expiresIn: '1d' }
         );
 
+        // Actualizar ESTADO a 1 en MySQL (Sesión activa)
         await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: ID_PERSO_USER } }); 
         
-        console.log("¡LOGIN EXITOSO! Token generado y ESTADO actualizado a 1.");
-        console.log("=== FIN DE INTENTO DE LOGIN ===");
-
+        // Devolvemos respuesta exitosa
         res.json({ 
             message: 'Login exitoso',
             token, 
@@ -268,7 +248,7 @@ exports.loginDriver = async (req, res) => {
         });
 
     } catch (error) {
-        console.error('ERROR CRÍTICO EN LOGIN:', error);
+        console.error('Error en Login Logística:', error);
         res.status(500).json({ message: 'Error interno del servidor al intentar iniciar sesión.' });
     }
 };
