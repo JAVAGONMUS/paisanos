@@ -190,22 +190,17 @@ exports.checkUsername = async (req, res) => {
 };
 
 exports.loginDriver = async (req, res) => {
-    // Usamos 'username' para coincidir con el campo de tu App
     const { username, password } = req.body; 
 
     try {
         // 1. BUSCAR CREDENCIALES (MySQL)
         const userCredentials = await Usuario.findOne({ where: { USUARIO: username } }); 
         
-        // REGLA 1: Verificar si existe el usuario y si la contraseña coincide
         if (!userCredentials || !bcrypt.compareSync(password, userCredentials.PASSWORD)) {
-            return res.status(401).json({ 
-                message: 'Datos incorrectos!' 
-            });
+            return res.status(401).json({ message: 'Datos incorrectos!' });
         }
 
         // REGLA 2: Verificar ESTADO de sesión (MySQL)
-        // Si es diferente de 0, asumimos sesión activa o cierre incorrecto
         if (userCredentials.ESTADO !== 0) {
             return res.status(403).json({ 
                 message: 'El conductor debe consultar a soporte tecnico' 
@@ -215,13 +210,22 @@ exports.loginDriver = async (req, res) => {
         const ID_PERSO_USER = userCredentials.ID_PERSO;
 
         // REGLA 3: Verificar STATUS administrativo (PostgreSQL)
+        // Incluimos la búsqueda del registro del conductor
         const driver = await Driver.findOne({ where: { ID_PERSO: ID_PERSO_USER } });
         
-        // Verificamos que exista el registro y que STATUS sea 1 (true)
-        if (!driver || driver.STATUS !== true && driver.STATUS !== 1) {
+        if (!driver || (driver.STATUS !== true && driver.STATUS !== 1)) {
             return res.status(403).json({ 
                 message: 'El conductor no ha sido autorizado, no tiene permitido iniciar sesión.' 
             });
+        }
+
+        // --- 💡 NUEVA LÓGICA: OBTENER PLACAS DEL VEHÍCULO ---
+        let placas = "No asignado";
+        if (driver.ID_VEH) {
+            const vehiculo = await Vehiculo.findByPk(driver.ID_VEH);
+            if (vehiculo) {
+                placas = vehiculo.PLACAS;
+            }
         }
 
         // --- TODO CORRECTO: PROCEDER AL LOGIN ---
@@ -236,14 +240,15 @@ exports.loginDriver = async (req, res) => {
         // Actualizar ESTADO a 1 en MySQL (Sesión activa)
         await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: ID_PERSO_USER } }); 
         
-        // Devolvemos respuesta exitosa
+        // Devolvemos respuesta exitosa con la data del vehículo
         res.json({ 
             message: 'Login exitoso',
             token, 
             driver: {
                 id: driver.ID_COND,
                 status: driver.STATUS,
-                isOnline: driver.IS_ONLINE
+                isOnline: driver.IS_ONLINE,
+                placas: placas // ⬅️ Enviamos las placas al frontend
             }
         });
 
