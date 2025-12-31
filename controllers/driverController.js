@@ -209,8 +209,7 @@ exports.loginDriver = async (req, res) => {
 
         const ID_PERSO_USER = userCredentials.ID_PERSO;
 
-        // REGLA 3: Verificar STATUS administrativo (PostgreSQL)
-        // Incluimos la búsqueda del registro del conductor
+        // REGLA 3: Verificar STATUS administrativo del Conductor (PostgreSQL)
         const driver = await Driver.findOne({ where: { ID_PERSO: ID_PERSO_USER } });
         
         if (!driver || (driver.STATUS !== true && driver.STATUS !== 1)) {
@@ -219,14 +218,21 @@ exports.loginDriver = async (req, res) => {
             });
         }
 
-        // --- 💡 NUEVA LÓGICA: OBTENER PLACAS DEL VEHÍCULO ---
-        let placas = "No asignado";
-        if (driver.ID_VEH) {
-            const vehiculo = await Vehiculo.findByPk(driver.ID_VEH);
-            if (vehiculo) {
-                placas = vehiculo.PLACAS;
-            }
+        // --- 💡 NUEVA LÓGICA: VERIFICAR VEHÍCULO Y SU ESTADO ---
+        if (!driver.ID_VEH) {
+            return res.status(403).json({ message: 'El conductor no tiene un vehículo asignado.' });
         }
+
+        const vehiculo = await Vehiculo.findByPk(driver.ID_VEH);
+
+        // REGLA 4: Verificar que el vehículo esté activo (ESTADO === 1)
+        if (!vehiculo || vehiculo.ESTADO !== 1) {
+            return res.status(403).json({ 
+                message: 'El vehículo asignado no se encuentra activo o habilitado por administración.' 
+            });
+        }
+
+        const placas = vehiculo.PLACAS;
 
         // --- TODO CORRECTO: PROCEDER AL LOGIN ---
         
@@ -248,7 +254,7 @@ exports.loginDriver = async (req, res) => {
                 id: driver.ID_COND,
                 status: driver.STATUS,
                 isOnline: driver.IS_ONLINE,
-                placas: placas // ⬅️ Enviamos las placas al frontend
+                placas: placas 
             }
         });
 
