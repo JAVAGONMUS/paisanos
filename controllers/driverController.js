@@ -278,3 +278,15 @@ exports.updateStatus = async (req, res) => {
         res.status(500).json({ message: 'Error interno del servidor.' });
     }
 };
+
+
+const isMatch = bcrypt.compareSync(password, usuario.PASSWORD);
+
+// --- BLOQUE DE PRUEBA TEMPORAL ---
+console.log("---------------- LOGIN TEST ----------------");
+console.log("Usuario ingresado:", username);
+console.log("Password (texto plano) que llegó del cel:", password);
+console.log("Hash que se recuperó de la BD MySQL:", usuario.PASSWORD);
+console.log("¿Coinciden según Bcrypt?:", isMatch);
+console.log("--------------------------------------------");
+// ---------------------------------
