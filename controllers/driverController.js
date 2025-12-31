@@ -279,3 +279,22 @@ exports.updateStatus = async (req, res) => {
     }
 };
 
+exports.logoutDriver = async (req, res) => {
+    try {
+        // El ID_PERSO viene del token decodificado por el middleware authMiddleware
+        const { userId } = req.user; 
+
+        // Solo cambiamos a 0 si el estado actual es 1
+        const usuario = await Usuario.findOne({ where: { ID_PERSO: userId } });
+
+        if (usuario && usuario.ESTADO === 1) {
+            await Usuario.update({ ESTADO: 0 }, { where: { ID_PERSO: userId } });
+            return res.json({ message: "Sesión cerrada correctamente." });
+        }
+
+        res.status(400).json({ message: "No se pudo cerrar sesión o el estado no es válido." });
+    } catch (error) {
+        console.error("Error en logout:", error);
+        res.status(500).json({ message: "Error interno del servidor." });
+    }
+};
