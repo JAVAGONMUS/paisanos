@@ -200,7 +200,7 @@ exports.loginDriver = async (req, res) => {
         // REGLA 1: Verificar si existe el usuario y si la contraseña coincide
         if (!userCredentials || !bcrypt.compareSync(password, userCredentials.PASSWORD)) {
             return res.status(401).json({ 
-                message: 'Credenciales malas, la contraseña esta mala o el usuario es incorrecto.' 
+                message: 'Datos incorrectos!' 
             });
         }
 
@@ -208,7 +208,7 @@ exports.loginDriver = async (req, res) => {
         // Si es diferente de 0, asumimos sesión activa o cierre incorrecto
         if (userCredentials.ESTADO !== 0) {
             return res.status(403).json({ 
-                message: 'El usuario ya tiene una sesión activa o no cerró sesión correctamente la anterior vez.' 
+                message: 'El conductor debe consultar a soporte tecnico' 
             });
         }
 
@@ -220,7 +220,7 @@ exports.loginDriver = async (req, res) => {
         // Verificamos que exista el registro y que STATUS sea 1 (true)
         if (!driver || driver.STATUS !== true && driver.STATUS !== 1) {
             return res.status(403).json({ 
-                message: 'El conductor no está en alta, sus credenciales son correctas pero no tiene permitido iniciar sesión.' 
+                message: 'El conductor no ha sido autorizado, no tiene permitido iniciar sesión.' 
             });
         }
 
