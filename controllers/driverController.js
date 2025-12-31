@@ -8,14 +8,11 @@ require('dotenv').config();
 
 const convertDateToDBFormat = (dateString) => {
     if (!dateString || dateString.trim() === '') return null;
-    
     const cleanDate = dateString.replace(/\//g, '');
-    
     if (cleanDate.length === 8) {
         const dd = cleanDate.substring(0, 2);
         const mm = cleanDate.substring(2, 4);
         const aaaa = cleanDate.substring(4, 8);
-        
         return `${aaaa}-${mm}-${dd}`; 
     }
     return null;
@@ -174,30 +171,85 @@ exports.registerDriver = async (req, res) => {
     }
 };
 
+exports.checkUsername = async (req, res) => {
+    try {
+        const { username } = req.params;
+        // Buscamos en la tabla USUARIOS de MySQL
+        const userExists = await Usuario.findOne({ 
+            where: { USUARIO: username },
+            attributes: ['USUARIO'] // Solo traemos la columna necesaria por eficiencia
+        });
+
+        return res.status(200).json({ 
+            exists: !!userExists // Retorna true si existe, false si no
+        });
+    } catch (error) {
+        console.error('Error en checkUsername:', error);
+        return res.status(500).json({ exists: false });
+    }
+};
+
 exports.loginDriver = async (req, res) => {
-    const { email, password } = req.body;
+    // Usamos 'username' para coincidir con el campo de tu App
+    const { username, password } = req.body; 
 
     try {
-        const userCredentials = await Usuario.findOne({ where: { USUARIO: email } }); 
+        // 1. BUSCAR CREDENCIALES (MySQL)
+        const userCredentials = await Usuario.findOne({ where: { USUARIO: username } }); 
+        
+        // REGLA 1: Verificar si existe el usuario y si la contraseña coincide
         if (!userCredentials || !bcrypt.compareSync(password, userCredentials.PASSWORD)) {
-            return res.status(401).json({ message: 'Credenciales inválidas.' });
+            return res.status(401).json({ 
+                message: 'Credenciales malas, la contraseña esta mala o el usuario es incorrecto.' 
+            });
         }
-        const ID_PERSO_USER = userCredentials.ID_PERSO;         
+
+        // REGLA 2: Verificar ESTADO de sesión (MySQL)
+        // Si es diferente de 0, asumimos sesión activa o cierre incorrecto
+        if (userCredentials.ESTADO !== 0) {
+            return res.status(403).json({ 
+                message: 'El usuario ya tiene una sesión activa o no cerró sesión correctamente la anterior vez.' 
+            });
+        }
+
+        const ID_PERSO_USER = userCredentials.ID_PERSO;
+
+        // REGLA 3: Verificar STATUS administrativo (PostgreSQL)
         const driver = await Driver.findOne({ where: { ID_PERSO: ID_PERSO_USER } });
-        if (!driver) {
-            return res.status(403).json({ message: 'Usuario no es un conductor registrado o no tiene registro activo.' });
+        
+        // Verificamos que exista el registro y que STATUS sea 1 (true)
+        if (!driver || driver.STATUS !== true && driver.STATUS !== 1) {
+            return res.status(403).json({ 
+                message: 'El conductor no está en alta, sus credenciales son correctas pero no tiene permitido iniciar sesión.' 
+            });
         }
+
+        // --- TODO CORRECTO: PROCEDER AL LOGIN ---
+        
+        // Generar Token
         const token = jwt.sign(
             { userId: ID_PERSO_USER, driverId: driver.ID_COND, role: 'driver' }, 
             process.env.JWT_SECRET, 
             { expiresIn: '1d' }
         );
+
+        // Actualizar ESTADO a 1 en MySQL (Sesión activa)
         await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: ID_PERSO_USER } }); 
         
-        res.json({ token, driver });
+        // Devolvemos respuesta exitosa
+        res.json({ 
+            message: 'Login exitoso',
+            token, 
+            driver: {
+                id: driver.ID_COND,
+                status: driver.STATUS,
+                isOnline: driver.IS_ONLINE
+            }
+        });
+
     } catch (error) {
-        console.error('Error en Login:', error);
-        res.status(500).json({ message: 'Error interno del servidor.' });
+        console.error('Error en Login Logística:', error);
+        res.status(500).json({ message: 'Error interno del servidor al intentar iniciar sesión.' });
     }
 };
 
