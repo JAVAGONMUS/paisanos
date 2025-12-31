@@ -22,5 +22,5 @@ router.post('/status', verifyToken, driverController.updateStatus);
 
 // Obtener ubicaciones para el mapa
 router.get('/ubicaciones', getUbicaciones);
-
+router.post('/logout', verifyToken, driverController.logoutDriver);
 module.exports = router;
