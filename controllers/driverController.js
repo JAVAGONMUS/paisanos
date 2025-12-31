@@ -228,7 +228,7 @@ exports.loginDriver = async (req, res) => {
         // REGLA 4: Verificar que el vehículo esté activo (ESTADO === 1)
         if (!vehiculo || vehiculo.ESTADO !== 1) {
             return res.status(403).json({ 
-                message: 'Su vehículo asignado no se encuentra esta habilitado. Consulte con Administracion' 
+                message: 'Su vehículo asignado no se encuentra habilitado. Consulte con Administracion' 
             });
         }
 
