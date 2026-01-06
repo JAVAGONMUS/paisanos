@@ -32,6 +32,6 @@ router.post('/logout', verifyToken, driverController.logoutDriver);
 // --- RUTAS DE GEOLOCALIZACIÓN ---
 
 // Obtener ubicaciones para el mapa (puedes protegerla con verifyToken si solo es para uso interno)
-router.get('/ubicaciones', verifyToken, getUbicaciones);
+router.get('/ubicaciones', verifyToken, getUbicaciones); 
 
 module.exports = router;
