@@ -8,6 +8,7 @@ const { authenticateDBs } = require('./config/databases');
 const { setupAssociations } = require('./config/associations'); 
 
 // 2. IMPORTACIÓN DE MODELOS (PostgreSQL)
+// Asegúrate de que estos nombres de archivo coincidan exactamente con tu carpeta /models
 const Driver = require('./models/Driver');
 const HistorialGPS = require('./models/HistorialGPS');
 const HistorialViajes = require('./models/HistorialViajes');
@@ -31,7 +32,7 @@ const { initSocketIO } = require('./sockets/socketHandler');
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de CORS para Socket.io (Necesario para comunicación con la App)
+// Configuración de CORS para Socket.io
 const io = new Server(server, {
     cors: {
         origin: "*", 
@@ -39,7 +40,7 @@ const io = new Server(server, {
     }
 });
 
-// Hacer 'io' accesible globalmente para otros servicios si es necesario
+// Hacer 'io' accesible globalmente
 global.io = io;
 
 // 5. MIDDLEWARES
@@ -50,10 +51,10 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/ubicacion', ubicacionRoutes); 
 app.use('/api/catalogs', catalogsRoutes);
 
-// Inicializar la lógica de WebSockets
+// Inicializar Socket.io
 initSocketIO(io);
 
-// Middleware para manejo de errores global
+// Middleware de manejo de errores global
 app.use((err, req, res, next) => {
     console.error("❌ Error detectado en el servidor:", err.stack);
     res.status(500).json({ 
@@ -75,15 +76,22 @@ async function startServer() {
         setupAssociations();
         console.log('✅ Asociaciones de Sequelize establecidas.');
 
-        // Sincronizar modelos en PostgreSQL (Crea tablas o columnas nuevas como PERMISOS_ACEPTADOS)
+        // Sincronizar modelos en PostgreSQL
         console.log('🛰️ Sincronizando modelos PostgreSQL en Railway...');
+        
         for (const Model of pgModels) {
+            // Usamos alter: true para que actualice la estructura sin borrar datos existentes
+            // tras haber hecho el DROP manual previo en pgAdmin.
             await Model.sync({ alter: true }); 
-            console.log(`   * Tabla ${Model.tableName} verificada.`);
+            
+            // Usamos una validación para mostrar el nombre de la tabla correctamente en consola
+            const tableName = Model.tableName || (Model.options && Model.options.tableName) || Model.name;
+            console.log(`   * Tabla ${tableName} verificada.`);
         }
+        
         console.log('✅ Base de datos PostgreSQL lista y actualizada.');
 
-        // Encender el motor
+        // Encender el servidor
         server.listen(PORT, () => {
             console.log('=========================================================');
             console.log(`🚀 PAISANOS BACKEND ACTIVO EN PUERTO: ${PORT}`);
@@ -93,7 +101,8 @@ async function startServer() {
 
     } catch (err) {
         console.error('❌ Error fatal al iniciar el servidor:', err);
-        process.exit(1);
+        // Esperamos un segundo para que el log se alcance a escribir en Railway antes de salir
+        setTimeout(() => process.exit(1), 1000);
     }
 }
 
