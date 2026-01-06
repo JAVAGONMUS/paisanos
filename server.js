@@ -3,32 +3,33 @@ const http = require('http');
 const { Server } = require('socket.io');
 require('dotenv').config();
 
-// 💡 Importamos la función de autenticación y las instancias de DB
+// 1. IMPORTACIÓN DE CONFIGURACIONES Y DB
 const { authenticateDBs } = require('./config/databases'); 
 const { setupAssociations } = require('./config/associations'); 
 
-// 💡 IMPORTAR MODELOS DE POSTGRESQL (Asegúrate que los nombres coincidan con tus archivos)
+// 2. IMPORTACIÓN DE MODELOS (PostgreSQL)
 const Driver = require('./models/Driver'); 
 const Vehiculo = require('./models/Vehiculo');
-// Aquí debes importar los modelos de HISTORIAL_GPS y VIAJES_ACTIVOS si ya tienes los archivos creados
-// const HistorialGPS = require('./models/HistorialGPS'); 
+const HistorialGPS = require('./models/HistorialGPS'); 
 
+// Agrupamos los modelos para la sincronización automática
 const pgModels = [
     Driver,
     Vehiculo,
-    // HistorialGPS
+    HistorialGPS
 ];
 
-// Importar rutas
+// 3. IMPORTACIÓN DE RUTAS
 const driverRoutes = require('./routes/driverRoutes'); 
 const ubicacionRoutes = require('./routes/ubicacionRoutes'); 
 const catalogsRoutes = require('./routes/catalogsRoutes');
 const { initSocketIO } = require('./sockets/socketHandler'); 
 
+// 4. CONFIGURACIÓN DEL SERVIDOR
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de CORS para Socket.io
+// Configuración de CORS para Socket.io (Necesario para comunicación con la App)
 const io = new Server(server, {
     cors: {
         origin: "*", 
@@ -36,24 +37,23 @@ const io = new Server(server, {
     }
 });
 
-// 🔒 SEGURIDAD: Hacer 'io' accesible globalmente
-// Esto permite que tus controladores usen global.io.emit si fuera necesario
+// Hacer 'io' accesible globalmente para otros servicios si es necesario
 global.io = io;
 
-// Middleware Global
+// 5. MIDDLEWARES
 app.use(express.json());
 
-// RUTAS DE LA API
+// 6. DEFINICIÓN DE RUTAS API
 app.use('/api/drivers', driverRoutes);
 app.use('/api/ubicacion', ubicacionRoutes); 
 app.use('/api/catalogs', catalogsRoutes);
 
-// Inicializar la lógica de Socket.io
+// Inicializar la lógica de WebSockets
 initSocketIO(io);
 
-// Middleware para manejo de errores
+// Middleware para manejo de errores global
 app.use((err, req, res, next) => {
-    console.error("❌ Error detectado:", err.stack);
+    console.error("❌ Error detectado en el servidor:", err.stack);
     res.status(500).json({ 
         success: false, 
         message: '¡Algo salió mal en el servidor de PAISANOS!',
@@ -63,37 +63,37 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3000;
 
-// --- Lógica de Sincronización y Arranque ---
+// 7. LÓGICA DE ARRANQUE Y SINCRONIZACIÓN
 async function startServer() {
     try {
         console.log('⏳ Conectando a bases de datos (MySQL & Postgres)...');
         await authenticateDBs(); 
         
-        // 2. ESTABLECER ASOCIACIONES (MySQL)
+        // Configurar relaciones de MySQL
         setupAssociations();
         console.log('✅ Asociaciones de Sequelize establecidas.');
 
-        // 3. Sincronizar los modelos de PostgreSQL
+        // Sincronizar modelos en PostgreSQL (Crea tablas o columnas nuevas como PERMISOS_ACEPTADOS)
         console.log('🛰️ Sincronizando modelos PostgreSQL en Railway...');
         for (const Model of pgModels) {
-            // alter: true actualiza la tabla si agregaste columnas (como PERMISOS_ACEPTADOS)
             await Model.sync({ alter: true }); 
             console.log(`   * Tabla ${Model.tableName || Model.name} verificada.`);
         }
-        console.log('✅ Base de datos PostgreSQL lista.');
+        console.log('✅ Base de datos PostgreSQL lista y actualizada.');
 
-        // 4. Arrancar el servidor
+        // Encender el motor
         server.listen(PORT, () => {
-            console.log('---------------------------------------------------------');
+            console.log('=========================================================');
             console.log(`🚀 PAISANOS BACKEND ACTIVO EN PUERTO: ${PORT}`);
-            console.log(`📡 SOCKET.IO LISTO PARA RASTREO GPS`);
-            console.log('---------------------------------------------------------');
+            console.log(`📡 ESCUCHANDO RASTREO GPS EN TIEMPO REAL`);
+            console.log('=========================================================');
         });
 
     } catch (err) {
-        console.error('❌ Error fatal al iniciar el servidor (DB):', err);
+        console.error('❌ Error fatal al iniciar el servidor:', err);
         process.exit(1);
     }
 }
 
+// Iniciar el proceso
 startServer();
