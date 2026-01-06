@@ -2,22 +2,44 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const verifyToken = (req, res, next) => {
-    const token = req.header('Authorization');
+    // 1. Obtener el token del header
+    const authHeader = req.header('Authorization');
 
-    if (!token) {
-        return res.status(401).json({ message: 'Acceso denegado. No hay token proporcionado.' });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ 
+            success: false, 
+            message: 'Acceso denegado. Formato de token inválido o inexistente.' 
+        });
     }
 
+    const token = authHeader.split(' ')[1];
+
     try {
-        // El token viene típicamente como 'Bearer TOKEN_STRING'. Extraemos solo el token.
-        const tokenString = token.replace('Bearer ', '');
-        const verified = jwt.verify(tokenString, process.env.JWT_SECRET);
+        // 2. Verificar autenticidad del token
+        const verified = jwt.verify(token, process.env.JWT_SECRET);
         
-        // Adjuntamos el payload decodificado al objeto request
-        req.user = verified; 
+        // Adjuntamos el payload decodificado (que contiene id, permisos, etc.)
+        req.user = verified;
+
+        // 3. SEGURIDAD DE IDENTIDAD (Cross-Check)
+        // Si la petición trae un id_cond (como en las rutas de GPS), 
+        // validamos que sea el mismo del Token.
+        const idCondEnBody = req.body.id_cond || req.params.id_cond;
+        
+        if (idCondEnBody && String(idCondEnBody) !== String(req.user.id)) {
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Violación de seguridad: El ID del conductor no coincide con el token.' 
+            });
+        }
+
         next();
     } catch (err) {
-        res.status(400).json({ message: 'Token inválido o expirado.' });
+        console.error("Error en validación de Token:", err.message);
+        res.status(403).json({ 
+            success: false, 
+            message: 'Sesión inválida o expirada. Por favor, inicie sesión de nuevo.' 
+        });
     }
 };
 
