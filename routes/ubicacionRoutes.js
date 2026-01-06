@@ -1,11 +1,14 @@
 const express = require('express');
 const router = express.Router();
-const ubicacionController = require('../controllers/ubicacionController');
-const { actualizarUbicacionConductor } = require('../controllers/ubicacionController');
-const { verificarToken } = require('../middlewares/authMiddleware'); // Tu seguridad JWT
+// Importación limpia de ambas funciones desde el controlador
+const { getUbicaciones, actualizarUbicacionConductor } = require('../controllers/ubicacionController');
+// Corregido: Debe ser verifyToken para coincidir con tu authMiddleware.js
+const verifyToken = require('../middlewares/authMiddleware'); 
 
-router.get('/ubicaciones', ubicacionController.getUbicaciones);
+// Obtener catálogo de departamentos/municipios
+router.get('/ubicaciones', getUbicaciones);
 
-router.post('/update-location', verificarToken, actualizarUbicacionConductor);
+// Actualizar ubicación actual (Ruta protegida para el GPS)
+router.post('/update-location', verifyToken, actualizarUbicacionConductor);
 
 module.exports = router;
