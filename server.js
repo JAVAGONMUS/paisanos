@@ -8,15 +8,17 @@ const { authenticateDBs } = require('./config/databases');
 const { setupAssociations } = require('./config/associations'); 
 
 // 2. IMPORTACIÓN DE MODELOS (PostgreSQL)
-const Driver = require('./models/Driver'); 
+const Driver = require('./models/Driver');
+const HistorialGPS = require('./models/HistorialGPS');
+const HistorialViajes = require('./models/HistorialViajes');
 const Vehiculo = require('./models/Vehiculo');
-const HistorialGPS = require('./models/HistorialGPS'); 
 
 // Agrupamos los modelos para la sincronización automática
 const pgModels = [
     Driver,
     Vehiculo,
-    HistorialGPS
+    HistorialGPS,
+    HistorialViajes
 ];
 
 // 3. IMPORTACIÓN DE RUTAS
@@ -77,7 +79,7 @@ async function startServer() {
         console.log('🛰️ Sincronizando modelos PostgreSQL en Railway...');
         for (const Model of pgModels) {
             await Model.sync({ alter: true }); 
-            console.log(`   * Tabla ${Model.tableName || Model.name} verificada.`);
+            console.log(`   * Tabla ${Model.tableName} verificada.`);
         }
         console.log('✅ Base de datos PostgreSQL lista y actualizada.');
 
