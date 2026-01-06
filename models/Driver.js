@@ -1,5 +1,4 @@
 const { DataTypes } = require('sequelize');
-const { DataTypes } = require('sequelize');
 const { sequelizePostgres } = require('../config/databases');
 
 const Driver = sequelizePostgres.define('Driver', {
@@ -15,6 +14,7 @@ const Driver = sequelizePostgres.define('Driver', {
     PUNTAJE: { type: DataTypes.DECIMAL(3, 2), defaultValue: 5.00 },
     COMENTARIOS: { type: DataTypes.TEXT, allowNull: true },
     VIAJES: { type: DataTypes.INTEGER, defaultValue: 0 },
+    PERMISOS_ACEPTADOS: { type: DataTypes.BOOLEAN, allowNull: true, defaultValue: null },
     UPDATED_AT: { type: DataTypes.DATE },
     LAST_UPDATED: { type: DataTypes.DATE },
     CREATED_AT: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
