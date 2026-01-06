@@ -66,4 +66,8 @@ const actualizarUbicacionConductor = async (req, res) => {
     }
 };
 
-module.exports = { actualizarUbicacionConductor };
+module.exports = {
+    actualizarUbicacionConductor,
+    getUbicaciones
+};
+
