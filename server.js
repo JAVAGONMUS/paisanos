@@ -48,7 +48,7 @@ app.use(express.json());
 
 // 6. DEFINICIÓN DE RUTAS API
 app.use('/api/drivers', driverRoutes);
-app.use('/api/ubicacion', ubicacionRoutes); 
+app.use('/api/ubicaciones', ubicacionRoutes); 
 app.use('/api/catalogs', catalogsRoutes);
 
 // Inicializar Socket.io
