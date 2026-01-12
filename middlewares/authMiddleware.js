@@ -2,44 +2,36 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 const verifyToken = (req, res, next) => {
-    // 1. Obtener el token del header
     const authHeader = req.header('Authorization');
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ 
             success: false, 
-            message: 'Acceso denegado. Formato de token inválido o inexistente.' 
+            message: 'Acceso denegado.' 
         });
     }
 
     const token = authHeader.split(' ')[1];
 
     try {
-        // 2. Verificar autenticidad del token
         const verified = jwt.verify(token, process.env.JWT_SECRET);
-        
-        // Adjuntamos el payload decodificado (que contiene id, permisos, etc.)
-        req.user = verified;
+        req.user = verified; // Aquí req.user.id es el ID_COND
 
-        // 3. SEGURIDAD DE IDENTIDAD (Cross-Check)
-        // Si la petición trae un id_cond (como en las rutas de GPS), 
-        // validamos que sea el mismo del Token.
-        const idCondEnBody = req.body.id_cond || req.params.id_cond;
+        // Ajuste de Seguridad: Verificamos id_cond en body, params o query
+        const idCondPeticion = req.body.id_cond || req.params.id_cond || req.query.id_cond;
         
-        if (idCondEnBody && String(idCondEnBody) !== String(req.user.id)) {
+        // Si hay un ID en la petición, debe ser igual al del Token
+        if (idCondPeticion && String(idCondPeticion) !== String(req.user.id)) {
+            console.log(`⚠️ Alerta: Token ID (${req.user.id}) no coincide con Body ID (${idCondPeticion})`);
             return res.status(403).json({ 
                 success: false, 
-                message: 'Violación de seguridad: El ID del conductor no coincide con el token.' 
+                message: 'Violación de seguridad: Identidad no verificada.' 
             });
         }
 
         next();
     } catch (err) {
-        console.error("Error en validación de Token:", err.message);
-        res.status(403).json({ 
-            success: false, 
-            message: 'Sesión inválida o expirada. Por favor, inicie sesión de nuevo.' 
-        });
+        res.status(403).json({ success: false, message: 'Token inválido.' });
     }
 };
 
