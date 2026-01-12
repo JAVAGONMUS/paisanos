@@ -166,15 +166,26 @@ exports.loginDriver = async (req, res) => {
 };
 
 exports.updatePermissions = async (req, res) => {
-    const { id_cond, estado } = req.body;
+    // Obtenemos el ID del token (más seguro) o del body
+    const id_cond = req.user ? req.user.id : req.body.id_cond;
+    const { estado } = req.body;
+
     try {
+        // Sequelize se encarga de convertir el booleano de JS al formato de Postgres
         await Driver.update(
-            { PERMISOS_ACEPTADOS: estado },
+            { PERMISOS_ACEPTADOS: estado }, 
             { where: { ID_COND: id_cond } }
         );
-        res.json({ success: true, message: 'Permisos actualizados.' });
+
+        console.log(`DB UPDATED: Conductor ${id_cond} ahora tiene permisos en ${estado}`);
+        
+        res.json({ 
+            success: true, 
+            message: 'Estado de permisos actualizado en Postgres' 
+        });
     } catch (error) {
-        res.status(500).json({ success: false });
+        console.error("Error en updatePermissions Backend:", error);
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
