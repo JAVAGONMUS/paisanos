@@ -179,28 +179,18 @@ exports.updatePermissions = async (req, res) => {
 };
 
 exports.updateStatus = async (req, res) => {
-    const { driverId } = req.user; 
-    const { status } = req.body; 
-
-    if (!['disponible', 'no_disponible'].includes(status)) {
-        return res.status(400).json({ message: 'Estado no válido.' });
-    }
+    const id_cond = req.user ? req.user.id : req.body.id_cond;
+    const { estado } = req.body;
 
     try {
-        const is_online_value = status === 'disponible';
-
-        const [updated] = await Driver.update(
-            { IS_ONLINE: is_online_value, LAST_UPDATED: new Date() }, 
-            { where: { ID_COND: driverId } }
+        await Driver.update(
+            { PERMISOS_ACEPTADOS: estado },
+            { where: { ID_COND: id_cond } }
         );
-
-        if (updated) {
-            return res.json({ message: `Estado actualizado a: ${status}` });
-        }
-        res.status(404).json({ message: 'Conductor no encontrado.' });
+        res.json({ success: true, message: 'Segunda línea de defensa actualizada.' });
     } catch (error) {
-        console.error('Error al actualizar estado:', error);
-        res.status(500).json({ message: 'Error interno del servidor.' });
+        console.error("Error updatePermissions:", error);
+        res.status(500).json({ success: false });
     }
 };
 
@@ -219,4 +209,3 @@ exports.logoutDriver = async (req, res) => {
         res.status(500).json({ message: "Error al cerrar sesión." });
     }
 };
-
