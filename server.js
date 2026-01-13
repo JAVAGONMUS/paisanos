@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const { Op } = require('sequelize'); // 👈 IMPORTANTE: Añadido para el limpiador
 require('dotenv').config();
 
 // 1. IMPORTACIÓN DE CONFIGURACIONES Y DB
@@ -8,13 +9,11 @@ const { authenticateDBs } = require('./config/databases');
 const { setupAssociations } = require('./config/associations'); 
 
 // 2. IMPORTACIÓN DE MODELOS (PostgreSQL)
-// Asegúrate de que estos nombres de archivo coincidan exactamente con tu carpeta /models
 const Driver = require('./models/Driver');
 const HistorialGPS = require('./models/HistorialGPS');
 const HistorialViajes = require('./models/HistorialViajes');
 const Vehiculo = require('./models/Vehiculo');
 
-// Agrupamos los modelos para la sincronización automática
 const pgModels = [
     Driver,
     Vehiculo,
@@ -32,7 +31,6 @@ const { initSocketIO } = require('./sockets/socketHandler');
 const app = express();
 const server = http.createServer(app);
 
-// Configuración de CORS para Socket.io
 const io = new Server(server, {
     cors: {
         origin: "*", 
@@ -40,7 +38,6 @@ const io = new Server(server, {
     }
 });
 
-// Hacer 'io' accesible globalmente
 global.io = io;
 
 // 5. MIDDLEWARES
@@ -51,10 +48,8 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/ubicacion', ubicacionRoutes); 
 app.use('/api/catalogs', catalogsRoutes);
 
-// Inicializar Socket.io
 initSocketIO(io);
 
-// Middleware de manejo de errores global
 app.use((err, req, res, next) => {
     console.error("❌ Error detectado en el servidor:", err.stack);
     res.status(500).json({ 
@@ -72,19 +67,13 @@ async function startServer() {
         console.log('⏳ Conectando a bases de datos (MySQL & Postgres)...');
         await authenticateDBs(); 
         
-        // Configurar relaciones de MySQL
         setupAssociations();
         console.log('✅ Asociaciones de Sequelize establecidas.');
 
-        // Sincronizar modelos en PostgreSQL
         console.log('🛰️ Sincronizando modelos PostgreSQL en Railway...');
         
         for (const Model of pgModels) {
-            // Usamos alter: true para que actualice la estructura sin borrar datos existentes
-            // tras haber hecho el DROP manual previo en pgAdmin.
             await Model.sync({ alter: true }); 
-            
-            // Usamos una validación para mostrar el nombre de la tabla correctamente en consola
             const tableName = Model.tableName || (Model.options && Model.options.tableName) || Model.name;
             console.log(`   * Tabla ${tableName} verificada.`);
         }
@@ -97,14 +86,41 @@ async function startServer() {
             console.log(`🚀 PAISANOS BACKEND ACTIVO EN PUERTO: ${PORT}`);
             console.log(`📡 ESCUCHANDO RASTREO GPS EN TIEMPO REAL`);
             console.log('=========================================================');
+
+            // --- 🚀 INICIO DEL LIMPIADOR AUTOMÁTICO (ESTRATEGIA B) ---
+            console.log('🧹 Limpiador de inactividad activado (Cada 2 minutos)');
+            
+            setInterval(async () => {
+                try {
+                    // Si un conductor no envía GPS en 5 minutos, se considera inactivo
+                    const MINUTOS_LIMITE = 5;
+                    const tiempoCorte = new Date(Date.now() - (MINUTOS_LIMITE * 60 * 1000));
+
+                    const [actualizados] = await Driver.update(
+                        { IS_ONLINE: false },
+                        { 
+                            where: {
+                                IS_ONLINE: true,
+                                // Compara si la última actualización es menor al tiempo de corte
+                                UPDATED_AT: { [Op.lt]: tiempoCorte } 
+                            }
+                        }
+                    );
+
+                    if (actualizados > 0) {
+                        console.log(`🧹 [AUTO-OFFLINE] ${actualizados} conductores desconectados por inactividad.`);
+                    }
+                } catch (error) {
+                    console.error("❌ Error en limpiador de inactividad:", error);
+                }
+            }, 2 * 60 * 1000); // 120,000 ms = 2 minutos
+            // --- 🏁 FIN DEL LIMPIADOR ---
         });
 
     } catch (err) {
         console.error('❌ Error fatal al iniciar el servidor:', err);
-        // Esperamos un segundo para que el log se alcance a escribir en Railway antes de salir
         setTimeout(() => process.exit(1), 1000);
     }
 }
 
-// Iniciar el proceso
 startServer();
