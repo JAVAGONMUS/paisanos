@@ -37,32 +37,39 @@ const getUbicaciones = async (req, res) => {
  * Actualiza la ubicación actual del conductor y registra el historial (Transacción SQL)
  */
 const actualizarUbicacionConductor = async (req, res) => {
-    const { lat, lon, id_cond, velocidad, esInicioSesion } = req.body;
-    console.log(`📡 Intentando actualizar GPS -> ID_COND: ${id_cond}, Latitud: ${lat}, Longitud: ${lon}, Velocidad: ${velocidad}, EsInicioSesion:${esInicioSesion}`);
-    if (!lat || !lon || !id_cond || !velocidad) {
-        console.error("❌ Error: Faltan parámetros en el body");
-        return res.status(400).json({ message: "Faltan parámetros requeridos" });
-    }
-    // Si 'pool' es undefined por algún error de exportación, esto evitará el crash
-    if (!pool) {
-        console.error("❌ Error Crítico: El objeto 'pool' no está definido. Revisa config/databases.js");
-        return res.status(500).json({ message: "Error de configuración en el servidor" });
+    // 1. Extraemos con posibles variantes para no fallar
+    const { 
+        lat, Latitud, 
+        lon, Longitud, 
+        id_cond, 
+        velocidad, Velocidad,
+        esInicioSesion, EsInicioSesion 
+    } = req.body;
+
+    // 2. Normalizamos los datos (si viene como 'Latitud', lo asignamos a 'finalLat')
+    const finalLat = lat || Latitud;
+    const finalLon = lon || Longitud;
+    const finalVel = velocidad !== undefined ? velocidad : (Velocidad !== undefined ? Velocidad : 0);
+    const finalEsInicio = esInicioSesion || EsInicioSesion;
+
+    // LOG DE DEPURACIÓN INTERNA
+    console.log(`🔍 Validando -> Lat: ${finalLat}, Lon: ${finalLon}, ID: ${id_cond}`);
+
+    // 3. Verificamos los datos normalizados
+    if (!finalLat || !finalLon || !id_cond) {
+        console.error("❌ Error: Faltan parámetros. Recibido:", req.body);
+        return res.status(400).json({ 
+            message: "Faltan parámetros requeridos",
+            recibido: req.body 
+        });
     }
 
-    // --- VALIDACIÓN DE VELOCIDAD (ALERTA) ---
-    const LIMITE_VELOCIDAD = 100;
-    if (velocidad && parseFloat(velocidad) > LIMITE_VELOCIDAD) {
-        console.log(`⚠️ ALERTA: El conductor ${id_cond} va a ${velocidad} km/h (Exceso de velocidad)`);
-        // Aquí podrías insertar en una tabla de 'ALERTAS' en el futuro
-    }
+    const client = await pool.connect();
 
-    let client;
     try {
-        // Aquí es donde daba el error (línea 54 según tus logs)
-        client = await pool.connect(); 
-
         await client.query('BEGIN');
 
+        // Actualización en CONDUCTORES
         const updateQuery = `
             UPDATE CONDUCTORES 
             SET UBICACION_LAT = $1, 
@@ -74,14 +81,23 @@ const actualizarUbicacionConductor = async (req, res) => {
             WHERE ID_COND = $4
         `;
         
-        await client.query(updateQuery, [lat, lon, velocidad || 0, id_cond]);
+        const result = await client.query(updateQuery, [
+            parseFloat(finalLat), 
+            parseFloat(finalLon), 
+            parseFloat(finalVel), 
+            id_cond
+        ]);
 
-        if (esInicioSesion === true || esInicioSesion === 'true') {
+        console.log(`✅ Resultado Update: ${result.rowCount} filas afectadas.`);
+
+        // Historial si es inicio de sesión
+        if (finalEsInicio === true || finalEsInicio === 'true') {
             const insertHistorial = `
                 INSERT INTO "HISTORIAL_GPS" (ID_COND, UBICACION_LAT, UBICACION_LON, CREATED_AT)
                 VALUES ($1, $2, $3, NOW())
             `;
-            await client.query(insertHistorial, [id_cond, lat, lon]);
+            await client.query(insertHistorial, [id_cond, parseFloat(finalLat), parseFloat(finalLon)]);
+            console.log("📍 Historial guardado.");
         }
 
         await client.query('COMMIT');
@@ -89,7 +105,7 @@ const actualizarUbicacionConductor = async (req, res) => {
 
     } catch (error) {
         if (client) await client.query('ROLLBACK');
-        console.error("❌ Error detectado en el servidor:", error);
+        console.error("❌ ERROR EN SQL:", error.message);
         res.status(500).json({ success: false, error: error.message });
     } finally {
         if (client) client.release();
