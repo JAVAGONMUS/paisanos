@@ -71,14 +71,14 @@ const actualizarUbicacionConductor = async (req, res) => {
 
         // Actualización en CONDUCTORES
         const updateQuery = `
-            UPDATE CONDUCTORES 
-            SET UBICACION_LAT = $1, 
-                UBICACION_LON = $2, 
-                VELOCIDAD = $3, 
-                IS_ONLINE = true, 
-                UPDATED_AT = NOW(),
-                LAST_UPDATED = NOW()
-            WHERE ID_COND = $4
+            UPDATE "CONDUCTORES" 
+            SET "UBICACION_LAT" = $1, 
+                "UBICACION_LON" = $2, 
+                "VELOCIDAD" = $3, 
+                "IS_ONLINE" = true, 
+                "UPDATED_AT" = NOW(),
+                "LAST_UPDATED" = NOW()
+            WHERE "ID_COND" = $4
         `;
         
         const result = await client.query(updateQuery, [
@@ -93,11 +93,11 @@ const actualizarUbicacionConductor = async (req, res) => {
         // Historial si es inicio de sesión
         if (finalEsInicio === true || finalEsInicio === 'true') {
             const insertHistorial = `
-                INSERT INTO "HISTORIAL_GPS" (ID_COND, UBICACION_LAT, UBICACION_LON, CREATED_AT)
+                INSERT INTO "HISTORIAL_GPS" ("ID_COND", "UBICACION_LAT", "UBICACION_LON", "CREATED_AT")
                 VALUES ($1, $2, $3, NOW())
             `;
             await client.query(insertHistorial, [id_cond, parseFloat(finalLat), parseFloat(finalLon)]);
-            console.log("📍 Historial guardado.");
+            console.log("📍 Historial guardado correctamente.");
         }
 
         await client.query('COMMIT');
