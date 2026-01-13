@@ -39,9 +39,14 @@ const getUbicaciones = async (req, res) => {
 const actualizarUbicacionConductor = async (req, res) => {
     const { lat, lon, id_cond, velocidad, esInicioSesion } = req.body;
     console.log(`📡 Intentando actualizar GPS -> ID_COND: ${id_cond}, Latitud: ${lat}, Longitud: ${lon}, Velocidad: ${velocidad}, EsInicioSesion:${esInicioSesion}`);
-    if (!lat || !lon || !id_cond) {
+    if (!lat || !lon || !id_cond || !velocidad) {
         console.error("❌ Error: Faltan parámetros en el body");
         return res.status(400).json({ message: "Faltan parámetros requeridos" });
+    }
+    // Si 'pool' es undefined por algún error de exportación, esto evitará el crash
+    if (!pool) {
+        console.error("❌ Error Crítico: El objeto 'pool' no está definido. Revisa config/databases.js");
+        return res.status(500).json({ message: "Error de configuración en el servidor" });
     }
 
     // --- VALIDACIÓN DE VELOCIDAD (ALERTA) ---
@@ -51,13 +56,13 @@ const actualizarUbicacionConductor = async (req, res) => {
         // Aquí podrías insertar en una tabla de 'ALERTAS' en el futuro
     }
 
-    const client = await pool.connect();
-
+    let client;
     try {
+        // Aquí es donde daba el error (línea 54 según tus logs)
+        client = await pool.connect(); 
+
         await client.query('BEGIN');
 
-        // 1. Actualizar tabla CONDUCTORES (Tiempo Real)
-        // Cambiamos IS_ONLINE a true y actualizamos coordenadas y velocidad
         const updateQuery = `
             UPDATE CONDUCTORES 
             SET UBICACION_LAT = $1, 
@@ -67,42 +72,27 @@ const actualizarUbicacionConductor = async (req, res) => {
                 UPDATED_AT = NOW(),
                 LAST_UPDATED = NOW()
             WHERE ID_COND = $4
-            RETURNING ID_COND;
         `;
         
-        const resUpdate = await client.query(updateQuery, [
-            parseFloat(lat), 
-            parseFloat(lon), 
-            parseFloat(velocidad) || 0, 
-            parseInt(id_cond)
-        ]);
+        await client.query(updateQuery, [lat, lon, velocidad || 0, id_cond]);
 
-        if (resUpdate.rowCount === 0) {
-            console.error(`⚠️ Advertencia: No se encontró ningún conductor con ID_COND: ${id_cond} en Postgres.`);
-        } else {
-            console.log(`✅ Tabla CONDUCTORES actualizada para ID: ${id_cond}`);
-        }
-
-        // 3. Historial GPS
         if (esInicioSesion === true || esInicioSesion === 'true') {
-            const insertHistorialQuery = `
+            const insertHistorial = `
                 INSERT INTO "HISTORIAL_GPS" (ID_COND, UBICACION_LAT, UBICACION_LON, CREATED_AT)
-                VALUES ($1, $2, $3, NOW());
+                VALUES ($1, $2, $3, NOW())
             `;
-            await client.query(insertHistorialQuery, [parseInt(id_cond), parseFloat(lat), parseFloat(lon)]);
-            console.log(`📍 Historial insertado correctamente.`);
+            await client.query(insertHistorial, [id_cond, lat, lon]);
         }
 
         await client.query('COMMIT');
         res.status(200).json({ success: true });
 
     } catch (error) {
-        await client.query('ROLLBACK');
-        console.error("❌ ERROR CRÍTICO EN POSTGRES:", error.message);
-        console.error("Detalle del error:", error.stack);
+        if (client) await client.query('ROLLBACK');
+        console.error("❌ Error detectado en el servidor:", error);
         res.status(500).json({ success: false, error: error.message });
     } finally {
-        client.release();
+        if (client) client.release();
     }
 };
 
