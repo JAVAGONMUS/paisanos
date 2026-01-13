@@ -38,7 +38,7 @@ const getUbicaciones = async (req, res) => {
  */
 const actualizarUbicacionConductor = async (req, res) => {
     const { lat, lon, id_cond, velocidad, esInicioSesion } = req.body;
-
+    console.log(`📡 Datos recibidos: ID:${id_cond}, Latitud:${lat}, Longitud:${lon}, Velocidad:${velocidad}, EsInicioSesion:${esInicioSesion}`);
     if (!lat || !lon || !id_cond) {
         return res.status(400).json({ message: "Faltan parámetros requeridos" });
     }
@@ -95,3 +95,4 @@ module.exports = {
     getUbicaciones,
     actualizarUbicacionConductor
 };
+
