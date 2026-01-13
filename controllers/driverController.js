@@ -190,33 +190,44 @@ exports.updatePermissions = async (req, res) => {
 };
 
 exports.updateStatus = async (req, res) => {
-    const id_cond = req.user ? req.user.id : req.body.id_cond;
-    const { estado } = req.body;
+    // Obtenemos id del token y el estado del body
+    const id_cond = req.user.id; 
+    const { is_online } = req.body; 
 
     try {
         await Driver.update(
-            { PERMISOS_ACEPTADOS: estado },
+            { 
+                IS_ONLINE: is_online,
+                UPDATED_AT: new Date() // Para el Time-out de actividad
+            },
             { where: { ID_COND: id_cond } }
         );
-        res.json({ success: true, message: 'Segunda línea de defensa actualizada.' });
+        
+        console.log(`📡 Conductor ${id_cond} cambió estado a: ${is_online ? 'ONLINE' : 'OFFLINE'}`);
+        res.json({ success: true, message: `Estado actualizado a ${is_online}` });
     } catch (error) {
-        console.error("Error updatePermissions:", error);
+        console.error("Error en updateStatus:", error);
         res.status(500).json({ success: false });
     }
 };
 
+// Cierre de sesión formal (Botón)
 exports.logoutDriver = async (req, res) => {
     try {
-        const { userId, id } = req.user; // Extraídos del Token por el Middleware
+        const { userId, id } = req.user; 
 
-        // 1. Poner offline al conductor en Postgres
-        await Driver.update({ IS_ONLINE: false }, { where: { ID_COND: id } });
+        // 1. Forzar OFFLINE en Postgres
+        await Driver.update({ 
+            IS_ONLINE: false,
+            UPDATED_AT: new Date() 
+        }, { where: { ID_COND: id } });
 
-        // 2. Liberar sesión en MySQL
+        // 2. Liberar sesión en MySQL (Estado 0)
         await Usuario.update({ ESTADO: 0 }, { where: { ID_PERSO: userId } });
 
-        res.json({ message: "Sesión cerrada correctamente." });
+        res.json({ success: true, message: "Sesión cerrada y conductor offline." });
     } catch (error) {
-        res.status(500).json({ message: "Error al cerrar sesión." });
+        console.error("Error en logout:", error);
+        res.status(500).json({ success: false, message: "Error al cerrar sesión." });
     }
 };
