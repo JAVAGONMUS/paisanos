@@ -37,40 +37,54 @@ const getUbicaciones = async (req, res) => {
  * Actualiza la ubicación actual del conductor y registra el historial (Transacción SQL)
  */
 const actualizarUbicacionConductor = async (req, res) => {
-    const { lat, lon, id_cond } = req.body;
+    const { lat, lon, id_cond, velocidad, esInicioSesion } = req.body;
 
     if (!lat || !lon || !id_cond) {
-        return res.status(400).json({ message: "Faltan parámetros requeridos (lat, lon, id_cond)" });
+        return res.status(400).json({ message: "Faltan parámetros requeridos" });
+    }
+
+    // --- VALIDACIÓN DE VELOCIDAD (ALERTA) ---
+    const LIMITE_VELOCIDAD = 100;
+    if (velocidad > LIMITE_VELOCIDAD) {
+        console.log(`⚠️ ALERTA: El conductor ${id_cond} va a ${velocidad} km/h (Exceso de velocidad)`);
+        // Aquí podrías insertar en una tabla de 'ALERTAS' en el futuro
     }
 
     const client = await pool.connect();
 
     try {
-        await client.query('BEGIN'); // 🚀 INICIO TRANSACCIÓN
+        await client.query('BEGIN');
 
-        // 1. Actualizar tabla CONDUCTORES
+        // 1. Actualizar tabla CONDUCTORES (Tiempo Real)
+        // Cambiamos IS_ONLINE a true y actualizamos coordenadas y velocidad
         const updateQuery = `
             UPDATE CONDUCTORES 
-            SET UBICACION_LAT = $1, UBICACION_LON = $2, UPDATED_AT = NOW()
-            WHERE ID_COND = $3;
+            SET UBICACION_LAT = $1, 
+                UBICACION_LON = $2, 
+                VELOCIDAD = $3, 
+                IS_ONLINE = true, 
+                UPDATED_AT = NOW()
+            WHERE ID_COND = $4;
         `;
-        await client.query(updateQuery, [lat, lon, id_cond]);
+        await client.query(updateQuery, [lat, lon, velocidad || 0, id_cond]);
 
-        // 2. Insertar en HISTORIAL_GPS
-        const insertHistorialQuery = `
-            INSERT INTO HISTORIAL_GPS (ID_COND, UBICACION_LAT, UBICACION_LON, CREATED_AT)
-            VALUES ($1, $2, $3, NOW());
-        `;
-        await client.query(insertHistorialQuery, [id_cond, lat, lon]);
+        // 2. Insertar en HISTORIAL_GPS solo si es el primer registro del login
+        if (esInicioSesion === true) {
+            const insertHistorialQuery = `
+                INSERT INTO HISTORIAL_GPS (ID_COND, UBICACION_LAT, UBICACION_LON, CREATED_AT)
+                VALUES ($1, $2, $3, NOW());
+            `;
+            await client.query(insertHistorialQuery, [id_cond, lat, lon]);
+            console.log(`📍 Check-in inicial registrado para conductor ${id_cond}`);
+        }
 
-        await client.query('COMMIT'); // ✅ CONFIRMAR CAMBIOS
-        
-        res.status(200).json({ success: true, message: "Ubicación e historial registrados." });
+        await client.query('COMMIT');
+        res.status(200).json({ success: true, alertaVelocidad: velocidad > LIMITE_VELOCIDAD });
 
     } catch (error) {
-        await client.query('ROLLBACK'); // ❌ REVERTIR EN CASO DE ERROR
-        console.error("Error crítico en transacción GPS:", error);
-        res.status(500).json({ success: false, message: "Error al guardar en base de datos." });
+        await client.query('ROLLBACK');
+        console.error("Error crítico en actualización de estado/GPS:", error);
+        res.status(500).json({ success: false });
     } finally {
         client.release();
     }
