@@ -38,8 +38,9 @@ const getUbicaciones = async (req, res) => {
  */
 const actualizarUbicacionConductor = async (req, res) => {
     const { lat, lon, id_cond, velocidad, esInicioSesion } = req.body;
-    console.log(`📡 Datos recibidos: ID:${id_cond}, Latitud:${lat}, Longitud:${lon}, Velocidad:${velocidad}, EsInicioSesion:${esInicioSesion}`);
+    console.log(`📡 Intentando actualizar GPS -> ID_COND: ${id_cond}, Latitud: ${lat}, Longitud: ${lon}, Velocidad: ${velocidad}, EsInicioSesion:${esInicioSesion}`);
     if (!lat || !lon || !id_cond) {
+        console.error("❌ Error: Faltan parámetros en el body");
         return res.status(400).json({ message: "Faltan parámetros requeridos" });
     }
 
@@ -63,28 +64,43 @@ const actualizarUbicacionConductor = async (req, res) => {
                 UBICACION_LON = $2, 
                 VELOCIDAD = $3, 
                 IS_ONLINE = true, 
-                UPDATED_AT = NOW()
-            WHERE ID_COND = $4;
+                UPDATED_AT = NOW(),
+                LAST_UPDATED = NOW()
+            WHERE ID_COND = $4
+            RETURNING ID_COND;
         `;
-        await client.query(updateQuery, [lat, lon, velocidad || 0, id_cond]);
+        
+        const resUpdate = await client.query(updateQuery, [
+            parseFloat(lat), 
+            parseFloat(lon), 
+            parseFloat(velocidad) || 0, 
+            parseInt(id_cond)
+        ]);
 
-        // 2. Insertar en HISTORIAL_GPS solo si es el primer registro del login
-        if (esInicioSesion === true) {
+        if (resUpdate.rowCount === 0) {
+            console.error(`⚠️ Advertencia: No se encontró ningún conductor con ID_COND: ${id_cond} en Postgres.`);
+        } else {
+            console.log(`✅ Tabla CONDUCTORES actualizada para ID: ${id_cond}`);
+        }
+
+        // 3. Historial GPS
+        if (esInicioSesion === true || esInicioSesion === 'true') {
             const insertHistorialQuery = `
-                INSERT INTO HISTORIAL_GPS (ID_COND, UBICACION_LAT, UBICACION_LON, CREATED_AT)
+                INSERT INTO "HISTORIAL_GPS" (ID_COND, UBICACION_LAT, UBICACION_LON, CREATED_AT)
                 VALUES ($1, $2, $3, NOW());
             `;
-            await client.query(insertHistorialQuery, [id_cond, lat, lon]);
-            console.log(`📍 Check-in inicial registrado para conductor ${id_cond}`);
+            await client.query(insertHistorialQuery, [parseInt(id_cond), parseFloat(lat), parseFloat(lon)]);
+            console.log(`📍 Historial insertado correctamente.`);
         }
 
         await client.query('COMMIT');
-        res.status(200).json({ success: true, alertaVelocidad: velocidad > LIMITE_VELOCIDAD });
+        res.status(200).json({ success: true });
 
     } catch (error) {
         await client.query('ROLLBACK');
-        console.error("Error crítico en actualización de estado/GPS:", error);
-        res.status(500).json({ success: false });
+        console.error("❌ ERROR CRÍTICO EN POSTGRES:", error.message);
+        console.error("Detalle del error:", error.stack);
+        res.status(500).json({ success: false, error: error.message });
     } finally {
         client.release();
     }
@@ -95,4 +111,3 @@ module.exports = {
     getUbicaciones,
     actualizarUbicacionConductor
 };
-
