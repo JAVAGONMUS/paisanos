@@ -45,7 +45,7 @@ const actualizarUbicacionConductor = async (req, res) => {
 
     // --- VALIDACIÓN DE VELOCIDAD (ALERTA) ---
     const LIMITE_VELOCIDAD = 100;
-    if (velocidad > LIMITE_VELOCIDAD) {
+    if (velocidad && parseFloat(velocidad) > LIMITE_VELOCIDAD) {
         console.log(`⚠️ ALERTA: El conductor ${id_cond} va a ${velocidad} km/h (Exceso de velocidad)`);
         // Aquí podrías insertar en una tabla de 'ALERTAS' en el futuro
     }
