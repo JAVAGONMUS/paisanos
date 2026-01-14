@@ -4,7 +4,7 @@ const Driver = require('../models/Driver');
 const User = require('../models/User');       
 const Usuario = require('../models/Usuario'); 
 const Vehiculo = require('../models/Vehiculo');
-const { sequelizeMySQL } = require('../config/databases'); // Importante para el historial
+const { sequelizeMySQL } = require('../config/databases'); 
 const { QueryTypes } = require('sequelize');
 require('dotenv').config();
 
@@ -107,7 +107,6 @@ exports.checkUsername = async (req, res) => {
     }
 };
 
-// --- PASO 2: RECTIFICACIÓN DEL LOGIN (MySQL HISTORIAL) ---
 exports.loginDriver = async (req, res) => {
     const { username, password, intento, lat, lon } = req.body; 
 
@@ -132,8 +131,6 @@ exports.loginDriver = async (req, res) => {
         if (!vehiculo || vehiculo.ESTADO !== 1) {
             return res.status(403).json({ message: 'Vehículo no habilitado.' });
         }
-
-        // --- REGISTRO EN HISTORIAL_LOGIN (MySQL) ---
         const lugarFormateado = `${driver.ID_COND}//${lat || 0}//${lon || 0}`;
         await sequelizeMySQL.query(`
             INSERT INTO HISTORIAL_LOGIN 
@@ -157,7 +154,7 @@ exports.loginDriver = async (req, res) => {
             token, 
             driver: {
                 id: driver.ID_COND,
-                id_uss: userCredentials.ID_PERSO, // Enviamos el ID de usuario para el frontend
+                id_uss: userCredentials.ID_PERSO, 
                 placas: vehiculo.PLACAS,
                 permisos_aceptados: driver.PERMISOS_ACEPTADOS
             }
@@ -198,7 +195,7 @@ exports.updateStatus = async (req, res) => {
         res.status(500).json({ success: false });
     }
 };
-// --- PASO 4: RECTIFICACIÓN DEL LOGOUT (MySQL HISTORIAL TIPO 11/33) ---
+
 exports.logoutDriver = async (req, res) => {
     try {
         // Obtenemos IDs del token (inyectado por el middleware)
