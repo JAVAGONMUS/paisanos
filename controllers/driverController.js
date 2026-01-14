@@ -198,7 +198,6 @@ exports.updateStatus = async (req, res) => {
         res.status(500).json({ success: false });
     }
 };
-
 // --- PASO 4: RECTIFICACIÓN DEL LOGOUT (MySQL HISTORIAL TIPO 11/33) ---
 exports.logoutDriver = async (req, res) => {
     try {
