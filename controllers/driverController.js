@@ -137,8 +137,16 @@ exports.loginDriver = async (req, res) => {
             return res.status(403).json({ message: 'Vehículo no habilitado.' });
         }
 
+        // Si el frontend envió 0 o no envió nada, bloqueamos el acceso
+        if (!lat || !lon || parseFloat(lat) === 0 || parseFloat(lon) === 0) {
+            return res.status(422).json({ 
+                success: false, 
+                message: 'Error de Seguridad: No se detectó ubicación GPS válida.' 
+            });
+        }
+
         // --- REGISTRO EN HISTORIAL_LOGIN (MySQL) ---
-        const lugarFormateado = `${driver.ID_COND}//${lat || 0}//${lon || 0}`;
+        const lugarFormateado = `${driver.ID_COND}//${lat}//${lon}`;
         await sequelizeMySQL.query(`
             INSERT INTO HISTORIAL_LOGIN 
             (ID_USS, ID_AGEN, CAJA, TIPO, INTENTO, LUGAR, FECHA_ALTA, HORA_ALTA)
