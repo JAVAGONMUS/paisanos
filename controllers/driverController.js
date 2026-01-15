@@ -4,10 +4,13 @@ const Driver = require('../models/Driver');
 const User = require('../models/User');       
 const Usuario = require('../models/Usuario'); 
 const Vehiculo = require('../models/Vehiculo');
-const { sequelizeMySQL } = require('../config/databases'); // IMPORTANTE: Para MySQL Historial
+const { sequelizeMySQL } = require('../config/databases'); 
 const { QueryTypes } = require('sequelize');
 require('dotenv').config();
 
+/**
+ * Utilidad para convertir fechas de DD/MM/AAAA a YYYY-MM-DD
+ */
 const convertDateToDBFormat = (dateString) => {
     if (!dateString || dateString.trim() === '') return null;
     const cleanDate = dateString.replace(/\//g, '');
@@ -20,6 +23,9 @@ const convertDateToDBFormat = (dateString) => {
     return null;
 };
 
+/**
+ * 1. REGISTRO DE CONDUCTOR
+ */
 exports.registerDriver = async (req, res) => {
     const { 
         nombres, apellidos, dpi, vencimientoDPI, licencia, 
@@ -50,7 +56,7 @@ exports.registerDriver = async (req, res) => {
         const existingPerson = await User.findOne({ where: { CORREO1: email } });
         if (existingPerson) return res.status(409).json({ message: 'EL CORREO YA EXISTE EN EL SISTEMA.' });
         
-        // 1. Crear Persona (MySQL)
+        // A. Crear Persona (MySQL)
         const newPerson = await User.create({
             nombres, apellidos, dpi, vencimientoDPI: dbVencimientoDPI, 
             licencia, vencimientoLicencia: dbVencimientoLicencia, nit,
@@ -62,7 +68,7 @@ exports.registerDriver = async (req, res) => {
 
         idPerso = newPerson.ID_PERSO; 
 
-        // 2. Crear Usuario (MySQL)
+        // B. Crear Usuario (MySQL)
         const hashedPassword = await bcrypt.hash(password, 10);
         await Usuario.create({
             ID_PERSO: idPerso, ID_PER: ID_PERFIL_CONDUCTOR, 
@@ -71,7 +77,7 @@ exports.registerDriver = async (req, res) => {
             HORA_ALTA: horaAlta, USER_NEW_DATA: 0
         });
         
-        // 3. Crear Vehículo (Postgres)
+        // C. Crear Vehículo (Postgres)
         const newVehiculo = await Vehiculo.create({
             CODIGO: codigoVehiculo, PLACAS: placasVehiculo, TIPO: tipoVehiculo,
             COLOR: colorVehiculo, ESTADO: 0, ASEGURADORA: aseguradoraVehiculo,
@@ -80,7 +86,7 @@ exports.registerDriver = async (req, res) => {
         
         idVehiculo = newVehiculo.ID_VEH;
 
-        // 4. Crear Conductor (Postgres)
+        // D. Crear Conductor (Postgres)
         await Driver.create({
             ID_PERSO: idPerso, ID_VEH: idVehiculo,
             UBICACION_LAT: null, UBICACION_LON: null,
@@ -92,6 +98,7 @@ exports.registerDriver = async (req, res) => {
 
     } catch (error) {
         console.error('Error en Registro:', error);
+        // Rollback manual simple
         if (idPerso) {
             await Usuario.destroy({ where: { ID_PERSO: idPerso } }).catch(()=>{});
             await User.destroy({ where: { ID_PERSO: idPerso } }).catch(()=>{});
@@ -101,6 +108,9 @@ exports.registerDriver = async (req, res) => {
     }
 };
 
+/**
+ * 2. VALIDACIÓN DE USUARIO EXISTENTE
+ */
 exports.checkUsername = async (req, res) => {
     try {
         const { username } = req.params;
@@ -111,7 +121,9 @@ exports.checkUsername = async (req, res) => {
     }
 };
 
-// --- LOGIN RECTIFICADO (MySQL HISTORIAL) ---
+/**
+ * 3. LOGIN DE CONDUCTOR (MySQL HISTORIAL TIPO 1)
+ */
 exports.loginDriver = async (req, res) => {
     const { username, password, intento, lat, lon } = req.body; 
 
@@ -137,7 +149,7 @@ exports.loginDriver = async (req, res) => {
             return res.status(403).json({ message: 'Vehículo no habilitado.' });
         }
 
-        // Si el frontend envió 0 o no envió nada, bloqueamos el acceso
+        // VALIDACIÓN CRÍTICA DE GPS
         if (!lat || !lon || parseFloat(lat) === 0 || parseFloat(lon) === 0) {
             return res.status(422).json({ 
                 success: false, 
@@ -145,7 +157,7 @@ exports.loginDriver = async (req, res) => {
             });
         }
 
-        // --- REGISTRO EN HISTORIAL_LOGIN (MySQL) ---
+        // REGISTRO EN HISTORIAL_LOGIN (MySQL)
         const lugarFormateado = `${driver.ID_COND}//${lat}//${lon}`;
         await sequelizeMySQL.query(`
             INSERT INTO HISTORIAL_LOGIN 
@@ -156,14 +168,14 @@ exports.loginDriver = async (req, res) => {
             type: QueryTypes.INSERT
         });
 
-        // GENERAR TOKEN
+        // GENERAR TOKEN JWT
         const token = jwt.sign(
             { id: driver.ID_COND, userId: userCredentials.ID_PERSO, role: 'driver' }, 
             process.env.JWT_SECRET, 
             { expiresIn: '24h' }
         );
 
-        // Actualizar estado de sesión en MySQL
+        // Actualizar estado online en MySQL
         await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: userCredentials.ID_PERSO } }); 
         
         res.json({ 
@@ -183,6 +195,9 @@ exports.loginDriver = async (req, res) => {
     }
 };
 
+/**
+ * 4. ACTUALIZAR PERMISOS (GPS/CÁMARA)
+ */
 exports.updatePermissions = async (req, res) => {
     const id_cond = req.user ? req.user.id : req.body.id_cond;
     const { estado } = req.body;
@@ -194,6 +209,9 @@ exports.updatePermissions = async (req, res) => {
     }
 };
 
+/**
+ * 5. ACTUALIZAR ESTADO DISPONIBILIDAD
+ */
 exports.updateStatus = async (req, res) => {
     const id_cond = req.user.id; 
     const { is_online } = req.body; 
@@ -208,37 +226,47 @@ exports.updateStatus = async (req, res) => {
     }
 };
 
-// --- LOGOUT RECTIFICADO (MySQL HISTORIAL TIPO 11/33) ---
+/**
+ * 6. CIERRE DE SESIÓN (MySQL HISTORIAL TIPO 11 o 33)
+ */
 exports.logoutDriver = async (req, res) => {
     try {
-        const { userId, id } = req.user; 
+        // Extraemos datos del token (vía middleware) con respaldo de req.body
+        const id_cond = req.user?.id || req.body.id_cond;
+        const id_uss = req.user?.userId || req.body.id_uss; 
         const { lat, lon, tipoCierre } = req.body;
 
-        // 1. Forzar OFFLINE en Postgres
+        if (!id_cond || !id_uss) {
+            return res.status(400).json({ success: false, message: "IDs no identificados." });
+        }
+
+        // A. Forzar OFFLINE en Postgres
         await Driver.update({ 
             IS_ONLINE: false,
             UPDATED_AT: new Date() 
-        }, { where: { ID_COND: id } });
+        }, { where: { ID_COND: id_cond } });
 
-        // 2. Liberar sesión en MySQL (Estado 0)
-        await Usuario.update({ ESTADO: 0 }, { where: { ID_PERSO: userId } });
+        // B. Liberar sesión en MySQL (Estado 0)
+        await Usuario.update({ ESTADO: 0 }, { where: { ID_PERSO: id_uss } });
 
-        // 3. Registrar cierre en HISTORIAL_LOGIN (MySQL)
-        const lugarFormateado = `${id}//${lat || 0}//${lon || 0}`;
-        const tipoFinal = tipoCierre || 11; // 11=Normal (Botón), 33=Inesperado
+        // C. Registrar auditoría en HISTORIAL_LOGIN (MySQL)
+        const lugarFormateado = `${id_cond}//${lat || 0}//${lon || 0}`;
+        const tipoFinal = tipoCierre || 11; // 11=Manual, 33=Inesperado
 
         await sequelizeMySQL.query(`
             INSERT INTO HISTORIAL_LOGIN 
             (ID_USS, ID_AGEN, CAJA, TIPO, INTENTO, LUGAR, FECHA_ALTA, HORA_ALTA)
             VALUES (?, 0, 0, ?, 1, ?, CURDATE(), CURTIME())
         `, {
-            replacements: [userId, tipoFinal, lugarFormateado],
+            replacements: [id_uss, tipoFinal, lugarFormateado],
             type: QueryTypes.INSERT
         });
 
+        console.log(`✅ Logout exitoso registrado: ID_USS ${id_uss}, Tipo ${tipoFinal}`);
         res.json({ success: true, message: "Sesión cerrada correctamente." });
+
     } catch (error) {
-        console.error("Error en logout:", error);
-        res.status(500).json({ success: false, message: "Error al cerrar sesión." });
+        console.error("❌ Error en logout:", error);
+        res.status(500).json({ success: false, message: "Error al procesar el cierre." });
     }
 };
