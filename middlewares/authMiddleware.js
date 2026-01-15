@@ -15,14 +15,18 @@ const verifyToken = (req, res, next) => {
 
     try {
         const verified = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = verified; // Aquí req.user.id es el ID_COND
+        
+        // Adjuntamos el objeto verificado a req.user
+        // verified contiene: { id, userId, role }
+        req.user = verified; 
 
-        // Ajuste de Seguridad: Verificamos id_cond en body, params o query
+        // --- AJUSTE DE SEGURIDAD ---
+        // Buscamos id_cond en cualquier parte de la petición
         const idCondPeticion = req.body.id_cond || req.params.id_cond || req.query.id_cond;
         
-        // Si hay un ID en la petición, debe ser igual al del Token
+        // Si la petición trae un id_cond, validamos que pertenezca al dueño del token
         if (idCondPeticion && String(idCondPeticion) !== String(req.user.id)) {
-            console.log(`⚠️ Alerta: Token ID (${req.user.id}) no coincide con Body ID (${idCondPeticion})`);
+            console.log(`⚠️ ALERTA DE SEGURIDAD: Token ID (${req.user.id}) != Petición ID (${idCondPeticion})`);
             return res.status(403).json({ 
                 success: false, 
                 message: 'Violación de seguridad: Identidad no verificada.' 
@@ -31,7 +35,9 @@ const verifyToken = (req, res, next) => {
 
         next();
     } catch (err) {
-        res.status(403).json({ success: false, message: 'Token inválido.' });
+        // Diferenciamos si el token expiró o es simplemente falso
+        const message = err.name === 'TokenExpiredError' ? 'Sesión expirada.' : 'Token inválido.';
+        res.status(403).json({ success: false, message });
     }
 };
 
