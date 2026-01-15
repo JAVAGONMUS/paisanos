@@ -1,6 +1,6 @@
 const Departamento = require('../models/Departamento');
 const Municipio = require('../models/Municipio'); 
-const { pool, sequelizeMySQL } = require('../config/databases'); // Importamos ambas bases de datos
+const { pool } = require('../config/databases'); // Solo necesitamos el pool de Postgres
 const { QueryTypes } = require('sequelize');
 
 const DEFAULT_COUNTRY_ID = process.env.DEFAULT_COUNTRY_ID; 
@@ -31,29 +31,29 @@ const getUbicaciones = async (req, res) => {
 };
 
 /**
- * Actualiza la ubicación actual (Postgres) y registra auditoría de inicio (MySQL)
+ * Actualiza la ubicación actual UNICAMENTE en Postgres
+ * Esta función corre cada 5 segundos.
  */
 const actualizarUbicacionConductor = async (req, res) => {
     const { 
         lat, lon, 
-        id_cond, id_uss, // Recibimos ambos IDs
-        velocidad, 
-        esInicioSesion,
-        intento // Recibimos el número de intento desde el frontend
+        id_cond, 
+        velocidad 
     } = req.body;
 
-    // Log de monitoreo
-    console.log(`🔍 Validando -> Lat: ${lat}, Lon: ${lon}, ID_COND: ${id_cond}, ID_USS: ${id_uss}`);
+    // Log de monitoreo limpio (Ya no imprimimos ID_USS porque no es necesario aquí)
+    console.log(`📡 Rastreo -> Lat: ${lat}, Lon: ${lon}, ID_COND: ${id_cond}`);
 
     if (!lat || !lon || !id_cond) {
         return res.status(400).json({ message: "Faltan parámetros", recibido: req.body });
     }
 
-    const client = await pool.connect();
+    let client;
 
     try {
-        // --- PARTE 1: POSTGRESQL (Estado en Tiempo Real) ---
-        // Solo actualizamos la posición actual del conductor para el mapa
+        client = await pool.connect();
+
+        // --- UNICA RESPONSABILIDAD: POSTGRESQL (Estado en Tiempo Real) ---
         const updateQuery = `
             UPDATE "CONDUCTORES" 
             SET "UBICACION_LAT" = $1, 
@@ -64,40 +64,23 @@ const actualizarUbicacionConductor = async (req, res) => {
             WHERE "ID_COND" = $4
         `;
         
-        const result = await client.query(updateQuery, [
+        await client.query(updateQuery, [
             parseFloat(lat), 
             parseFloat(lon), 
             parseFloat(velocidad || 0), 
             id_cond
         ]);
 
-        // --- PARTE 2: MYSQL (Auditoría en HISTORIAL_LOGIN) ---
-        // Si el frontend marca que es el primer tracking tras el login:
-        if (esInicioSesion === true || esInicioSesion === 'true') {
-            
-            // Formato de cadena solicitado: (ID_COND+"//"+LATITUD+"//"+LONGITUD)
-            const lugarFormateado = `${id_cond}//${lat}//${lon}`;
-            const numIntento = intento || 1;
-
-            await sequelizeMySQL.query(`
-                INSERT INTO HISTORIAL_LOGIN 
-                (ID_USS, ID_AGEN, CAJA, TIPO, INTENTO, LUGAR, FECHA_ALTA, HORA_ALTA)
-                VALUES (?, 0, 0, 1, ?, ?, CURDATE(), CURTIME())
-            `, {
-                replacements: [id_uss, numIntento, lugarFormateado],
-                type: QueryTypes.INSERT
-            });
-
-            console.log(`📊 Registro de Inicio (TIPO 1) guardado en MySQL para ID_USS: ${id_uss}`);
-        }
+        // Ya no insertamos en HISTORIAL_LOGIN aquí. 
+        // Eso se hace en driverController.js al momento del Login y Logout.
 
         res.status(200).json({ 
             success: true, 
-            message: "Ubicación actualizada y auditoría registrada" 
+            message: "Ubicación actualizada en Postgres" 
         });
 
     } catch (error) {
-        console.error("❌ ERROR EN SINCRONIZACIÓN:", error.message);
+        console.error("❌ ERROR EN RASTREO POSTGRES:", error.message);
         res.status(500).json({ success: false, error: error.message });
     } finally {
         if (client) client.release();
