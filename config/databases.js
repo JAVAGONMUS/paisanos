@@ -1,4 +1,3 @@
-// config/databases.js
 const { Sequelize } = require('sequelize');
 const { Pool } = require('pg'); // 👈 AGREGADO: Necesario para consultas SQL puras
 require('dotenv').config();
@@ -49,7 +48,8 @@ const pool = new Pool({
   database: process.env.PG_DB_NAME,
   password: process.env.PG_DB_PASSWORD,
   port: process.env.PG_DB_PORT,
-  ssl: {
+  connectionString: process.env.DATABASE_URL,
+  ssl:  {
     rejectUnauthorized: false
   }
 });
