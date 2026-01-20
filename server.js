@@ -13,12 +13,14 @@ const Driver = require('./models/Driver');
 const HistorialGPS = require('./models/HistorialGPS');
 const HistorialViajes = require('./models/HistorialViajes');
 const Vehiculo = require('./models/Vehiculo');
+const Viajes = require('./models/Viajes');
 
 const pgModels = [
     Driver,
     Vehiculo,
     HistorialGPS,
-    HistorialViajes
+    HistorialViajes,
+    Viajes
 ];
 
 // 3. IMPORTACIÓN DE RUTAS
