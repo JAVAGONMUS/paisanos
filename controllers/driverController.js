@@ -4,6 +4,7 @@ const Driver = require('../models/Driver');
 const User = require('../models/User');       
 const Usuario = require('../models/Usuario'); 
 const Vehiculo = require('../models/Vehiculo');
+const Viajes = require('../models/Viajes');
 const { sequelizeMySQL } = require('../config/databases'); 
 const { QueryTypes } = require('sequelize');
 require('dotenv').config();
