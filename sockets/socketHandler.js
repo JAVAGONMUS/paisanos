@@ -99,13 +99,16 @@ exports.initSocketIO = (io) => {
         });
 
         // 4. Desconexión
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             const driverId = Object.keys(connectedDrivers).find(key => connectedDrivers[key] === socket.id);
             if (driverId) {
                 delete connectedDrivers[driverId];
-                console.log(`🛑 Conductor ${driverId} offline.`);
+                // ⚡️ ACTUACIÓN INMEDIATA: Evita que el limpiador de 2 min sea el único que actúe
+                await Driver.update({ IS_ONLINE: false }, { where: { ID_COND: driverId } });
+                console.log(`🛑 Conductor ${driverId} marcado offline por desconexión de red.`);
             }
         });
+        
     });
 };
 
