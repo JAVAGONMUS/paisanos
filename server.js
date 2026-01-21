@@ -74,7 +74,7 @@ async function startServer() {
                         { 
                             where: {
                                 IS_ONLINE: true,
-                                updatedAt: { [Op.lt]: tiempoCorte } // Sequelize suele usar updatedAt por defecto
+                                UPDATED_AT: { [Op.lt]: tiempoCorte } // Sequelize suele usar updatedAt por defecto
                             }
                         }
                     );
@@ -95,3 +95,4 @@ async function startServer() {
     }
 }
 startServer();
+
