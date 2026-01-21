@@ -67,22 +67,27 @@ async function startServer() {
                 try {
                     const MINUTOS_LIMITE = 5;
                     const tiempoCorte = new Date(Date.now() - (MINUTOS_LIMITE * 60 * 1000));
+                    
+                    // Actualizamos a offline a quienes no han enviado pulso GPS
                     const [actualizados] = await Driver.update(
-                        { IS_ONLINE: false },
+                        { IS_ONLINE: false }, // Asegúrate que este nombre coincida con tu modelo Driver
                         { 
                             where: {
                                 IS_ONLINE: true,
-                                UPDATED_AT: { [Op.lt]: tiempoCorte } 
+                                updatedAt: { [Op.lt]: tiempoCorte } // Sequelize suele usar updatedAt por defecto
                             }
                         }
                     );
+                    
                     if (actualizados > 0) {
-                        console.log(`🧹 [AUTO-OFFLINE] ${actualizados} conductores desconectados por inactividad.`);
+                        console.log(`🧹 [AUTO-OFFLINE] ${actualizados} conductores desconectados.`);
+                        // Opcional: Notificar por socket que se desconectaron
+                        global.io.emit('drivers_cleanup', { count: actualizados });
                     }
                 } catch (error) {
-                    console.error("❌ Error en limpiador de inactividad:", error);
+                    console.error("❌ Error en limpiador:", error);
                 }
-            }, 2 * 60 * 1000); // 120,000 ms = 2 minutos
+            }, 2 * 60 * 1000);
         });
     } catch (err) {
         console.error('❌ Error fatal al iniciar el servidor:', err);
