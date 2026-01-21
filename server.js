@@ -25,9 +25,12 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
-        origin: "*", 
+        origin: "*",
         methods: ["GET", "POST"]
-    }
+    },
+    connectTimeout: 45000,
+    pingTimeout: 30000,
+    pingInterval: 25000
 });
 global.io = io;
 app.use(express.json());
@@ -70,19 +73,20 @@ async function startServer() {
                     
                     // Actualizamos a offline a quienes no han enviado pulso GPS
                     const [actualizados] = await Driver.update(
-                        { IS_ONLINE: false }, // Asegúrate que este nombre coincida con tu modelo Driver
+                        { IS_ONLINE: false }, 
                         { 
                             where: {
                                 IS_ONLINE: true,
-                                UPDATED_AT: { [Op.lt]: tiempoCorte } // Sequelize suele usar updatedAt por defecto
-                            }
+                                UPDATED_AT: { [Op.lt]: tiempoCorte } 
+                            },
+                            returning: true // Esto permite saber qué IDs se actualizaron (solo en Postgres)
                         }
                     );
-                    
+
                     if (actualizados > 0) {
-                        console.log(`🧹 [AUTO-OFFLINE] ${actualizados} conductores desconectados.`);
-                        // Opcional: Notificar por socket que se desconectaron
-                        global.io.emit('drivers_cleanup', { count: actualizados });
+                        console.log(`🧹 [AUTO-OFFLINE] ${actualizados} conductores por inactividad.`);
+                        // Opcional: Si quieres avisarles para que la app no crea que sigue conectada
+                        global.io.emit('system_notification', { message: 'Revisión de conexiones activa' });
                     }
                 } catch (error) {
                     console.error("❌ Error en limpiador:", error);
@@ -95,4 +99,3 @@ async function startServer() {
     }
 }
 startServer();
-
