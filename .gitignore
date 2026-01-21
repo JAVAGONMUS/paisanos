@@ -3,6 +3,7 @@
 
 # Archivos de configuración local y secretos
 .env
+.env.*
 .env.local
 *.log
 
