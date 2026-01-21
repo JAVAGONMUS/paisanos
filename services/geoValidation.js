@@ -4,6 +4,11 @@ const db = require('../config/databases');
  * BLINDAJE PAISANOS: Valida si un punto GPS está dentro de los polígonos permitidos.
  */
 const verSectorMapaGps = async (lat, lng) => {
+  // Blindaje contra coordenadas inválidas o nulas
+  if (!lat || !lng || lat === 0 || lng === 0) {
+      return { enZona: false, zona: null };
+  }
+  
   try {
     // Validamos que vengan coordenadas válidas
     if (!lat || !lng) return { enZona: false, zona: null };
