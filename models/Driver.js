@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelizePostgres } = require('../config/databases');
+const Vehiculo = require('./Vehiculo');
 
 const Driver = sequelizePostgres.define('Driver', {
     ID_COND: { 
@@ -76,5 +77,5 @@ const Driver = sequelizePostgres.define('Driver', {
     // Mantenemos false para controlar los nombres de columnas manualmente en mayúsculas
     timestamps: false 
 });
-
+Driver.belongsTo(Vehiculo, { foreignKey: 'ID_VEH' });
 module.exports = Driver;
