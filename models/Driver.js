@@ -74,7 +74,6 @@ const Driver = sequelizePostgres.define('Driver', {
     }
 }, { 
     tableName: 'CONDUCTORES', 
-    // Mantenemos false para controlar los nombres de columnas manualmente en mayúsculas
     timestamps: false 
 });
 Driver.belongsTo(Vehiculo, { foreignKey: 'ID_VEH' });
