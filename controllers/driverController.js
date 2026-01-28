@@ -9,9 +9,6 @@ const { QueryTypes } = require('sequelize');
 const geoService = require('../services/geoValidation');
 require('dotenv').config();
 
-/**
- * Utilidad: Conversión de fechas
- */
 const convertDateToDBFormat = (dateString) => {
     if (!dateString || dateString.trim() === '') return null;
     const cleanDate = dateString.replace(/\//g, '');
@@ -23,27 +20,20 @@ const convertDateToDBFormat = (dateString) => {
     }
     return null;
 };
-
-// --- CONTROLADORES ---
-
 /**
  * ACTUALIZAR UBICACIÓN (Blindado por Middleware)
  */
 const updateLocation = async (req, res) => {
     const { driverId, lat, lng } = req.body;
     const id = req.user?.id || driverId;
-
     try {
-        // Actualización en Postgres
         await Driver.update({
             UBICACION_LAT: lat,
             UBICACION_LON: lng,
             IS_ONLINE: true,
-            UPDATED_AT: new Date()
-        }, { 
-            where: { ID_COND: id } 
-        });
-
+            UPDATED_AT: new Date() // Esto mantiene viva la sesión
+        }, { where: { ID_COND: id } });
+        
         // Emitir a pasajeros (Broadcast general)
         global.io.emit('driver_moved', { id, lat, lng });
 
@@ -144,7 +134,12 @@ const loginDriver = async (req, res) => {
 
         if (userCredentials.ESTADO === 2) return res.status(403).json({ message: 'Cuenta bloqueada.' });
 
-        const driver = await Driver.findOne({ where: { ID_PERSO: userCredentials.ID_PERSO } });
+        // RECTIFICACIÓN: Incluimos el Vehículo para obtener las PLACAS
+        const driver = await Driver.findOne({ 
+            where: { ID_PERSO: userCredentials.ID_PERSO },
+            include: [{ model: Vehiculo }] // VITAL: Asegura que traiga las placas
+        });
+
         if (!driver || !driver.STATUS) return res.status(403).json({ message: 'No autorizado por administración.' });
 
         // Auditoría MySQL
@@ -155,14 +150,25 @@ const loginDriver = async (req, res) => {
         `, { replacements: [userCredentials.ID_PERSO, intento || 1, lugarFormateado], type: QueryTypes.INSERT });
 
         const token = jwt.sign(
-            { id: driver.ID_COND, userId: userCredentials.ID_PERSO, role: 'driver' }, 
+            { id: driver.ID_COND, userId: userCredentials.ID_PERSO }, 
             process.env.JWT_SECRET, { expiresIn: '24h' }
         );
 
         await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: userCredentials.ID_PERSO } }); 
         
-        res.json({ success: true, token, driver: { id: driver.ID_COND, id_uss: userCredentials.ID_PERSO } });
+        // RESPUESTA RECTIFICADA PARA EL FRONTEND
+        res.json({ 
+            success: true, 
+            token, 
+            driver: { 
+                id: driver.ID_COND, 
+                id_uss: userCredentials.ID_PERSO,
+                placas: driver.Vehiculo ? driver.Vehiculo.PLACAS : "P-PENDIENTE",
+                permisos_aceptados: driver.PERMISOS_ACEPTADOS
+            } 
+        });
     } catch (error) {
+        console.error("Error en login:", error);
         res.status(500).json({ message: 'Error en el servidor.' });
     }
 };
