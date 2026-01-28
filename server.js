@@ -70,23 +70,26 @@ async function startServer() {
                 try {
                     const MINUTOS_LIMITE = 5;
                     const tiempoCorte = new Date(Date.now() - (MINUTOS_LIMITE * 60 * 1000));
-                    
-                    // Actualizamos a offline a quienes no han enviado pulso GPS
-                    const [actualizados] = await Driver.update(
-                        { IS_ONLINE: false }, 
-                        { 
-                            where: {
-                                IS_ONLINE: true,
-                                UPDATED_AT: { [Op.lt]: tiempoCorte } 
-                            },
-                            returning: true // Esto permite saber qué IDs se actualizaron (solo en Postgres)
+                    const conductoresAfectados = await Driver.findAll({
+                        where: {
+                            IS_ONLINE: true,
+                            UPDATED_AT: { [Op.lt]: tiempoCorte }
                         }
-                    );
+                    });
 
-                    if (actualizados > 0) {
-                        console.log(`🧹 [AUTO-OFFLINE] ${actualizados} conductores por inactividad.`);
-                        // Opcional: Si quieres avisarles para que la app no crea que sigue conectada
-                        global.io.emit('system_notification', { message: 'Revisión de conexiones activa' });
+                    if (conductoresAfectados.length > 0) {
+                        const ids = conductoresAfectados.map(d => d.ID);
+                        
+                        await Driver.update({ IS_ONLINE: false }, { where: { ID: ids } });
+                        
+                        console.log(`🧹 [AUTO-OFFLINE] ${ids.length} conductores desconectados.`);
+                        
+                        // Avisamos a las Apps específicas para que intenten reconectar o muestren aviso
+                        ids.forEach(id => {
+                            global.io.to(`driver_${id}`).emit('force_reconnect', { 
+                                reason: 'Inactividad de pulso GPS' 
+                            });
+                        });
                     }
                 } catch (error) {
                     console.error("❌ Error en limpiador:", error);
