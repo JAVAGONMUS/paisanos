@@ -78,19 +78,16 @@ async function startServer() {
                     });
 
                     if (conductoresAfectados.length > 0) {
-                        const ids = conductoresAfectados.map(d => d.ID);
-                        
-                        await Driver.update({ IS_ONLINE: false }, { where: { ID: ids } });
-                        
+                        const ids = conductoresAfectados.map(d => d.ID_COND);
+                        await Driver.update({ IS_ONLINE: false }, { where: { ID_COND: ids } });
                         console.log(`🧹 [AUTO-OFFLINE] ${ids.length} conductores desconectados.`);
-                        
-                        // Avisamos a las Apps específicas para que intenten reconectar o muestren aviso
-                        ids.forEach(id => {
-                            global.io.to(`driver_${id}`).emit('force_reconnect', { 
-                                reason: 'Inactividad de pulso GPS' 
+                            
+                            ids.forEach(id => {
+                                global.io.to(`driver_${id}`).emit('force_reconnect', { 
+                                    reason: 'Inactividad de pulso GPS' 
+                                });
                             });
-                        });
-                    }
+                        }
                 } catch (error) {
                     console.error("❌ Error en limpiador:", error);
                 }
