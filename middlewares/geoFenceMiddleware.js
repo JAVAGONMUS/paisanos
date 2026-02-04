@@ -2,14 +2,17 @@ const geoService = require('../services/geoValidation');
 const Driver = require('../models/Driver');
 
 const geoFenceGuard = async (req, res, next) => {
-    // 1. Extraer coordenadas del body (o de donde las envíe tu app)
-    const { lat, lng, driverId } = req.body;
+    const { lat, lng, lon, driverId } = req.body;
+    const longitude = lng || lon; // Usa el que venga definido
     const id = req.user?.id || driverId;
 
-    if (!lat || !lng) return next(); // Si no hay GPS, pasamos al siguiente (o puedes bloquear)
+    if (!lat || !longitude) {
+        console.log("⚠️ Middleware: GPS faltante en la petición body:", req.body);
+        return next(); 
+    }
 
     try {
-        const validacion = await geoService.verSectorMapaGps(lat, lng);
+        const validacion = await geoService.verSectorMapaGps(lat, longitude);
 
         if (!validacion.enZona) {
             // A. Cambiar estado en base de datos inmediatamente
