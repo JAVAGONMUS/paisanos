@@ -12,6 +12,10 @@ const User = require('./models/User');
 const Usuario = require('./models/Usuario');
 const Driver = require('./models/Driver');
 const Vehiculo = require('./models/Vehiculo');
+const Pais = require('./models/Pais');
+const Departamento = require('./models/Departamento');
+const Municipio = require('./models/Municipio');
+const Dominio = require('./models/Dominio');
 //const HistorialGPS = require('./models/HistorialGPS');
 //const HistorialViajes = require('./models/HistorialViajes');
 //const Viajes = require('./models/Viajes');
@@ -22,7 +26,11 @@ const allModels = [
     User,
     Usuario,
     Driver,
-    Vehiculo
+    Vehiculo,
+    Pais, 
+    Departamento,
+    Municipio, 
+    Dominio
     //FilesPer
     //HistorialGPS
     //HistorialViajes
