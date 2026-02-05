@@ -4,11 +4,10 @@ const Driver = require('../models/Driver');
 const User = require('../models/User');       
 const Usuario = require('../models/Usuario'); 
 const Vehiculo = require('../models/Vehiculo');
-const { sequelizeMySQL } = require('../config/databases'); 
-const { QueryTypes } = require('sequelize');
-const geoService = require('../services/geoValidation');
+const { pool, sequelizePostgres } = require('../config/databases'); 
 require('dotenv').config();
 
+// Helper para fechas
 const convertDateToDBFormat = (dateString) => {
     if (!dateString || dateString.trim() === '') return null;
     const cleanDate = dateString.replace(/\//g, '');
@@ -20,22 +19,22 @@ const convertDateToDBFormat = (dateString) => {
     }
     return null;
 };
+
 /**
- * ACTUALIZAR UBICACIÓN (Blindado por Middleware)
+ * ACTUALIZAR UBICACIÓN
  */
 const updateLocation = async (req, res) => {
-    const { driverId, lat, lng } = req.body;
+    const { driverId, lat, lon } = req.body; // Cambiado lng a lon para consistencia
     const id = req.user?.id || driverId;
     try {
         await Driver.update({
             UBICACION_LAT: lat,
-            UBICACION_LON: lng,
+            UBICACION_LON: lon,
             IS_ONLINE: true,
-            UPDATED_AT: new Date() // Esto mantiene viva la sesión
+            UPDATED_AT: new Date()
         }, { where: { ID_COND: id } });
         
-        // Emitir a pasajeros (Broadcast general)
-        global.io.emit('driver_moved', { id, lat, lng });
+        global.io.emit('driver_moved', { id, lat, lon });
 
         return res.status(200).json({ 
             success: true, 
@@ -48,7 +47,7 @@ const updateLocation = async (req, res) => {
 };
 
 /**
- * REGISTRO DE CONDUCTOR
+ * REGISTRO DE CONDUCTOR (Unificado en Postgres)
  */
 const registerDriver = async (req, res) => {
     const { 
@@ -69,14 +68,21 @@ const registerDriver = async (req, res) => {
     const fechaAlta = now.toISOString().split('T')[0];
     const horaAlta = now.toLocaleTimeString('en-US', { hour12: false });
     
-    let idPerso = null;
-    let idVehiculo = null;
+    // Iniciamos transacción unificada en Postgres
+    const t = await sequelizePostgres.transaction();
 
     try {
-        const existingPerson = await User.findOne({ where: { CORREO1: emailPart1 } });
-        if (existingPerson) return res.status(409).json({ message: 'EL CORREO YA EXISTE.' });
+        const existingPerson = await User.findOne({ 
+            where: { CORREO1: emailPart1 }, 
+            transaction: t 
+        });
         
-        // A. MySQL: Persona
+        if (existingPerson) {
+            await t.rollback();
+            return res.status(409).json({ message: 'EL CORREO YA EXISTE.' });
+        }
+
+        // 1. Crear Persona
         const newPerson = await User.create({
             nombres, apellidos, dpi, vencimientoDPI: dbVencimientoDPI, 
             licencia, vencimientoLicencia: dbVencimientoLicencia, nit,
@@ -84,44 +90,42 @@ const registerDriver = async (req, res) => {
             numeralDireccion, zonaDireccion, coloniaDireccion, 
             departamentoDireccion, municipioDireccion, email1: emailPart1,
             FECHA_ALTA: fechaAlta, HORA_ALTA: horaAlta, USER_NEW_DATA: 0
-        });
-        idPerso = newPerson.ID_PERSO; 
+        }, { transaction: t });
 
-        // B. MySQL: Usuario
+        // 2. Crear Usuario
         const hashedPassword = await bcrypt.hash(password, 10);
         await Usuario.create({
-            ID_PERSO: idPerso, ID_PER: 3, ESTADO: 0, 
+            ID_PERSO: newPerson.ID_PERSO, ID_PER: 3, ESTADO: 0, 
             USUARIO: emailPart1, PASSWORD: hashedPassword, 
             FECHA_ALTA: fechaAlta, HORA_ALTA: horaAlta, USER_NEW_DATA: 0
-        });
+        }, { transaction: t });
         
-        // C. Postgres: Vehículo
+        // 3. Crear Vehículo
         const newVehiculo = await Vehiculo.create({
             CODIGO: codigoVehiculo, PLACAS: placasVehiculo, TIPO: tipoVehiculo,
             COLOR: colorVehiculo, ESTADO: 0, ASEGURADORA: aseguradoraVehiculo,
             ID_SEGURO: idSeguroVehiculo, COMENTARIOS: comentariosVehiculo
-        });
-        idVehiculo = newVehiculo.ID_VEH;
+        }, { transaction: t });
 
-        // D. Postgres: Conductor
+        // 4. Crear Conductor
         await Driver.create({
-            ID_PERSO: idPerso, ID_VEH: idVehiculo, STATUS: false, IS_ONLINE: false
-        });
+            ID_PERSO: newPerson.ID_PERSO, 
+            ID_VEH: newVehiculo.ID_VEH, 
+            STATUS: false, 
+            IS_ONLINE: false
+        }, { transaction: t });
         
+        await t.commit();
         res.status(201).json({ message: 'Registro exitoso. En espera de aprobación.' });
     } catch (error) {
+        if (t) await t.rollback();
         console.error('Error en Registro:', error);
-        // Rollback básico
-        if (idPerso) {
-            await Usuario.destroy({ where: { ID_PERSO: idPerso } });
-            await User.destroy({ where: { ID_PERSO: idPerso } });
-        }
         res.status(500).json({ message: 'Error interno en registro.' });
     }
 };
 
 /**
- * LOGIN DE CONDUCTOR
+ * LOGIN DE CONDUCTOR (Auditoría vía Pool)
  */
 const loginDriver = async (req, res) => {
     const { username, password, intento, lat, lon } = req.body; 
@@ -134,20 +138,20 @@ const loginDriver = async (req, res) => {
 
         if (userCredentials.ESTADO === 2) return res.status(403).json({ message: 'Cuenta bloqueada.' });
 
-        // RECTIFICACIÓN: Incluimos el Vehículo para obtener las PLACAS
         const driver = await Driver.findOne({ 
             where: { ID_PERSO: userCredentials.ID_PERSO },
-            include: [{ model: Vehiculo }] // VITAL: Asegura que traiga las placas
+            include: [{ model: Vehiculo }] 
         });
 
         if (!driver || !driver.STATUS) return res.status(403).json({ message: 'No autorizado por administración.' });
 
-        // Auditoría MySQL
-        const lugarFormateado = `${driver.ID_COND}//${lat}//${lon}`;
-        await sequelizeMySQL.query(`
-            INSERT INTO HISTORIAL_LOGIN (ID_USS, ID_AGEN, CAJA, TIPO, INTENTO, LUGAR, FECHA_ALTA, HORA_ALTA)
-            VALUES (?, 0, 0, 1, ?, ?, CURDATE(), CURTIME())
-        `, { replacements: [userCredentials.ID_PERSO, intento || 1, lugarFormateado], type: QueryTypes.INSERT });
+        // Auditoría en Postgres usando Pool (SQL Crudo)
+        const lugarFormateado = `${driver.ID_COND}//${lat || 0}//${lon || 0}`;
+        await pool.query(`
+            INSERT INTO "HISTORIAL_LOGIN" 
+            ("ID_USS", "ID_AGEN", "CAJA", "TIPO", "INTENTO", "LUGAR", "FECHA_ALTA", "HORA_ALTA")
+            VALUES ($1, 0, 0, 1, $2, $3, CURRENT_DATE, CURRENT_TIME)
+        `, [userCredentials.ID_PERSO, intento || 1, lugarFormateado]);
 
         const token = jwt.sign(
             { id: driver.ID_COND, userId: userCredentials.ID_PERSO }, 
@@ -156,7 +160,6 @@ const loginDriver = async (req, res) => {
 
         await Usuario.update({ ESTADO: 1 }, { where: { ID_PERSO: userCredentials.ID_PERSO } }); 
         
-        // RESPUESTA RECTIFICADA PARA EL FRONTEND
         res.json({ 
             success: true, 
             token, 
@@ -186,33 +189,46 @@ const logoutDriver = async (req, res) => {
         await Usuario.update({ ESTADO: 0 }, { where: { ID_PERSO: id_uss } });
 
         const lugarFormateado = `${id_cond}//${lat || 0}//${lon || 0}`;
-        await sequelizeMySQL.query(`
-            INSERT INTO HISTORIAL_LOGIN (ID_USS, ID_AGEN, CAJA, TIPO, INTENTO, LUGAR, FECHA_ALTA, HORA_ALTA)
-            VALUES (?, 0, 0, ?, 1, ?, CURDATE(), CURTIME())
-        `, { replacements: [id_uss, tipoCierre || 11, lugarFormateado], type: QueryTypes.INSERT });
+        await pool.query(`
+            INSERT INTO "HISTORIAL_LOGIN" 
+            ("ID_USS", "ID_AGEN", "CAJA", "TIPO", "INTENTO", "LUGAR", "FECHA_ALTA", "HORA_ALTA")
+            VALUES ($1, 0, 0, $2, 1, $3, CURRENT_DATE, CURRENT_TIME)
+        `, [id_uss, tipoCierre || 11, lugarFormateado]);
 
         res.json({ success: true, message: "Sesión cerrada." });
     } catch (error) {
+        console.error("Error en logout:", error);
         res.status(500).json({ success: false, message: "Error al procesar el cierre." });
     }
 };
 
-// Exportación única y limpia
 module.exports = {
     updateLocation,
     registerDriver,
     loginDriver,
     logoutDriver,
     checkUsername: async (req, res) => {
-        const userExists = await Usuario.findOne({ where: { USUARIO: req.params.username } });
-        return res.status(200).json({ exists: !!userExists });
+        try {
+            const userExists = await Usuario.findOne({ where: { USUARIO: req.params.username } });
+            return res.status(200).json({ exists: !!userExists });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
     },
     updatePermissions: async (req, res) => {
-        await Driver.update({ PERMISOS_ACEPTADOS: req.body.estado }, { where: { ID_COND: req.user.id } });
-        res.json({ success: true });
+        try {
+            await Driver.update({ PERMISOS_ACEPTADOS: req.body.estado }, { where: { ID_COND: req.user.id } });
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
     },
     updateStatus: async (req, res) => {
-        await Driver.update({ IS_ONLINE: req.body.is_online, UPDATED_AT: new Date() }, { where: { ID_COND: req.user.id } });
-        res.json({ success: true });
+        try {
+            await Driver.update({ IS_ONLINE: req.body.is_online, UPDATED_AT: new Date() }, { where: { ID_COND: req.user.id } });
+            res.json({ success: true });
+        } catch (e) {
+            res.status(500).json({ error: e.message });
+        }
     }
 };
