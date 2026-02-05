@@ -1,80 +1,71 @@
 const { pool } = require('../config/databases'); 
-const geoService = require('../services/geoValidation'); // Importamos el blindaje
+const geoService = require('../services/geoValidation'); 
 
-// Mapas en memoria para rapidez de respuesta
+// Mapa de conductores conectados
 const connectedDrivers = {}; 
 
 exports.initSocketIO = (io) => {
     io.on('connection', (socket) => {
-        console.log(`📡 Cliente conectado al Socket: ${socket.id}`);
+        console.log(`📡 Conexión Segura Paisanos: ${socket.id}`);
 
-        // 1. Identificación del Conductor
+        // 1. Registro del Conductor en Sala Privada
         socket.on('driverConnect', ({ driverId }) => {
             if (driverId) {
-                // Unimos al conductor a su "Sala Privada" (Inviolable para alertas directas)
                 socket.join(`driver_${driverId}`);
                 connectedDrivers[driverId] = socket.id;
-                console.log(`✅ Conductor ${driverId} enlazado a sala privada.`);
+                console.log(`✅ Conductor ${driverId} encriptado en sala privada.`);
             }
         });
 
-        // 2. ACTUALIZACIÓN GPS CON BLINDAJE GEOGRÁFICO
+        // 2. Procesamiento de Ubicación con Blindaje Geográfico
         socket.on('updateLocation', async (data) => {
             const { driverId, lat, lon } = data;
-            
             if (!driverId || !lat || !lon) return;
 
-            // --- INICIO DEL BLINDAJE PAISANOS ---
             try {
+                // Validación contra el GeoJSON/PostGIS en el servicio
                 const validacion = await geoService.verSectorMapaGps(lat, lon);
 
                 if (!validacion.enZona) {
-                    console.log(`⚠️ BLOQUEO: Conductor ${driverId} fuera de zona.`);
+                    console.log(`⚠️ ALERTA: Driver ${driverId} ha abandonado la Zona Autorizada.`);
                     
-                    // A. Notificar al APP para que bloquee la interfaz
+                    // A. Bloqueo inmediato del Frontend (Activa el mapa DARK y el Modal)
                     socket.emit('forced_logout', { 
-                        reason: 'FUERA_DE_RANGO',
-                        mensaje: 'Estás fuera del área de servicio autorizada.' 
+                        reason: 'OFFSIDE',
+                        mensaje: 'Estás fuera del perímetro de Paisanos.' 
                     });
 
-                    // B. Forzar estado Offline en DB
+                    // B. Actualización de estado en base de datos para no asignarle viajes
                     await pool.query(
-                        'UPDATE "CONDUCTORES" SET "IS_ONLINE" = false WHERE "ID_COND" = $1', 
-                        [driverId]
+                        'UPDATE "CONDUCTORES" SET "IS_ONLINE" = false, "UBICACION_LAT" = $1, "UBICACION_LON" = $2 WHERE "ID_COND" = $3', 
+                        [lat, lon, driverId]
                     );
-                    
-                    return; // Cortamos la ejecución aquí
+                    return; 
                 }
 
-                // --- SI ESTÁ EN ZONA, PROCEDEMOS CON LA TRANSACCIÓN ---
+                // SI ESTÁ EN ZONA: Actualización normal y transparente
                 const client = await pool.connect();
                 try {
                     await client.query('BEGIN');
 
-                    // A. Actualizar ubicación actual
-                    const updateDriverQuery = `
-                        UPDATE "CONDUCTORES" 
-                        SET "UBICACION_LAT" = $1, "UBICACION_LON" = $2, "IS_ONLINE" = true, "UPDATED_AT" = NOW()
-                        WHERE "ID_COND" = $3
-                    `;
-                    await client.query(updateDriverQuery, [lat, lon, driverId]);
+                    await client.query(
+                        'UPDATE "CONDUCTORES" SET "UBICACION_LAT" = $1, "UBICACION_LON" = $2, "IS_ONLINE" = true, "UPDATED_AT" = NOW() WHERE "ID_COND" = $3',
+                        [lat, lon, driverId]
+                    );
 
-                    // B. Insertar en HISTORIAL_GPS
-                    const insertHistoryQuery = `
-                        INSERT INTO "HISTORIAL_GPS" ("ID_COND", "UBICACION_LAT", "UBICACION_LON", "CREATED_AT")
-                        VALUES ($1, $2, $3, NOW())
-                    `;
-                    await client.query(insertHistoryQuery, [driverId, lat, lon]);
+                    await client.query(
+                        'INSERT INTO "HISTORIAL_GPS" ("ID_COND", "UBICACION_LAT", "UBICACION_LON", "CREATED_AT") VALUES ($1, $2, $3, NOW())',
+                        [driverId, lat, lon]
+                    );
 
                     await client.query('COMMIT');
 
-                    // Confirmación al conductor
+                    // Confirmación de "Zona Segura" (Cambia el mapa a LIGHT si estaba en DARK)
                     socket.emit('locationUpdateSuccess', { 
-                        status: 'En línea',
-                        zona: validacion.zona.NOMBRE 
+                        zona: validacion.zona.NOMBRE || 'Zona Activa' 
                     });
 
-                    // Notificar a pasajeros (Broadcast optimizado)
+                    // Broadcast para Pasajeros
                     socket.broadcast.emit('driverLocationUpdate', { driverId, lat, lon });
 
                 } catch (dbError) {
@@ -85,39 +76,22 @@ exports.initSocketIO = (io) => {
                 }
 
             } catch (error) {
-                console.error('⚠️ ERROR CRÍTICO GPS/GEO:', error);
-                socket.emit('location_update_error', { 
-                    message: 'Error de validación de sistema.' 
-                });
+                console.error('❌ Error de Blindaje:', error);
             }
         });
 
-        // 3. Respuesta a Solicitudes de Viaje
-        socket.on('tripResponse', (data) => {
-            const { tripId, driverId, response } = data;
-            io.emit('driverResponse', { tripId, driverId, response });
-        });
-
-        // 4. Desconexión
         socket.on('disconnect', async () => {
             const driverId = Object.keys(connectedDrivers).find(key => connectedDrivers[key] === socket.id);
             if (driverId) {
                 delete connectedDrivers[driverId];
-                // ⚡️ ACTUACIÓN INMEDIATA: Evita que el limpiador de 2 min sea el único que actúe
-                await Driver.update({ IS_ONLINE: false }, { where: { ID_COND: driverId } });
-                console.log(`🛑 Conductor ${driverId} marcado offline por desconexión de red.`);
+                await pool.query('UPDATE "CONDUCTORES" SET "IS_ONLINE" = false WHERE "ID_COND" = $1', [driverId]);
+                console.log(`🛑 Driver ${driverId} Offline.`);
             }
         });
-        
     });
 };
 
-/**
- * Envío Quirúrgico de Viajes (Usa la sala privada)
- */
 exports.sendTripRequest = (driverId, tripData) => {
-    // En lugar de socketId, enviamos a la ROOM del conductor
-    // Esto es más seguro si el conductor cambió de red y tiene nuevo socketId
     global.io.to(`driver_${driverId}`).emit('newTripRequest', tripData);
     return true;
 };
