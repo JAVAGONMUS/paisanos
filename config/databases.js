@@ -2,6 +2,12 @@ const { Sequelize } = require('sequelize');
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// --- Configuración compartida de SSL ---
+const sslConfig = {
+  require: true,
+  rejectUnauthorized: false
+};
+
 // --- Conexión Única PostgreSQL (Sequelize) ---
 const sequelizePostgres = new Sequelize(
   process.env.PG_DB_NAME,
@@ -13,10 +19,7 @@ const sequelizePostgres = new Sequelize(
     dialect: 'postgres',
     logging: false,
     dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
+      ssl: sslConfig
     },
     define: {
       freezeTableName: true
@@ -25,25 +28,30 @@ const sequelizePostgres = new Sequelize(
 );
 
 // --- Pool para consultas crudas (PostGIS / GPS) ---
+// Rectificado para usar las variables individuales si DATABASE_URL no existe
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  host: process.env.PG_DB_HOST,
+  user: process.env.PG_DB_USER,
+  password: process.env.PG_DB_PASSWORD,
+  database: process.env.PG_DB_NAME,
+  port: process.env.PG_DB_PORT,
+  ssl: sslConfig
 });
 
 module.exports = {
-  sequelizePostgres, // Única instancia de Sequelize
+  sequelizePostgres,
   pool, 
   authenticateDBs: async () => {
     try {
+        // 1. Probar Sequelize
         await sequelizePostgres.authenticate();
-        console.log('✅ Conexión unificada PostgreSQL (PostGIS) establecida.');
+        console.log('✅ Conexión unificada PostgreSQL (Sequelize) OK.');
         
-        await pool.query('SELECT NOW()');
-        console.log('✅ Pool de PostgreSQL listo.');
+        // 2. Probar Pool Crudo
+        const res = await pool.query('SELECT NOW()');
+        console.log('✅ Pool de PostgreSQL (pg) OK:', res.rows[0].now);
     } catch (error) {
-      console.error('❌ Error al conectar a PostgreSQL:', error);
+      console.error('❌ Error crítico de conexión en databases.js:', error.message);
       throw error;
     }
   }
