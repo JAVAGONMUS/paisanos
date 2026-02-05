@@ -1,8 +1,7 @@
-// /app/models/Departamento.js
 const { DataTypes } = require('sequelize');
-const { sequelizeMySQL } = require('../config/databases'); 
+const { sequelizePostgres } = require('../config/databases'); // 👈 Rectificado
 
-const Departamento = sequelizeMySQL.define('Departamento', {
+const Departamento = sequelizePostgres.define('Departamento', {
     ID_DEP: {
         type: DataTypes.INTEGER,
         primaryKey: true,
