@@ -1,29 +1,15 @@
 const { DataTypes } = require('sequelize');
+const { sequelizePostgres } = require('../config/databases'); // 👈 Cambiado a Postgres
 
-// 🔑 CLAVE: Asegúrate de que esta variable coincida EXACTAMENTE con la exportación en databases.js
-const { sequelizeMySQL } = require('../config/databases'); 
-
-// Definición del modelo para la tabla PERSONAS en MySQL
-const User = sequelizeMySQL.define('User', {
-    // LLAVE PRIMARIA: ID_PERSO
+const User = sequelizePostgres.define('User', {
     ID_PERSO: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
-        field: 'ID_PERSO', // Columna en BD: ID_PERSO
+        field: 'ID_PERSO',
     },
-    // DATOS PERSONALES
-    nombres: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        field: 'NOMBRE', // Columna en BD: NOMBRE
-    },
-    apellidos: {
-        type: DataTypes.STRING,
-        allowNull: false,
-        field: 'APELLIDO', // Columna en BD: APELLIDO
-    },
-    // ... (El resto de campos de datos personales/contacto/dirección se mantienen) ...
+    nombres: { type: DataTypes.STRING, allowNull: false, field: 'NOMBRE' },
+    apellidos: { type: DataTypes.STRING, allowNull: false, field: 'APELLIDO' },
     dpi: { type: DataTypes.STRING, field: 'DPI' },
     vencimientoDPI: { type: DataTypes.DATEONLY, field: 'VENCE_DPI' },
     licencia: { type: DataTypes.STRING, field: 'LICENCIA' },
@@ -37,34 +23,14 @@ const User = sequelizeMySQL.define('User', {
     numeralDireccion: { type: DataTypes.STRING, field: 'NUM_DIREC' },
     zonaDireccion: { type: DataTypes.STRING, field: 'ZONA_DIREC' },
     coloniaDireccion: { type: DataTypes.STRING, field: 'COL_DIREC' },
-    // Mapeo a ID de Departamento
-    departamentoDireccion: { 
-        type: DataTypes.INTEGER, 
-        field: 'DEP_DIREC' 
-    },
-    // Mapeo a ID de Municipio
-    municipioDireccion: { 
-        type: DataTypes.INTEGER, 
-        field: 'MUN_DIREC' 
-    },    
-    // AUDITORÍA
-    FECHA_ALTA: {
-        type: DataTypes.DATEONLY, // Usar DATEONLY para YYYY-MM-DD
-        field: 'FECHA_ALTA',
-    },
-    HORA_ALTA: {
-        type: DataTypes.TIME, // Usar TIME para HH:MM:SS
-        field: 'HORA_ALTA',
-    },
-    USER_NEW_DATA: {
-        // 💡 Tipo cambiado a INTEGER, ya que hace referencia a un ID_PERSO (que es INTEGER)
-        type: DataTypes.INTEGER, 
-        field: 'USER_NEW_DATA',
-    },
+    departamentoDireccion: { type: DataTypes.INTEGER, field: 'DEP_DIREC' },
+    municipioDireccion: { type: DataTypes.INTEGER, field: 'MUN_DIREC' },    
+    FECHA_ALTA: { type: DataTypes.DATEONLY, field: 'FECHA_ALTA' },
+    HORA_ALTA: { type: DataTypes.TIME, field: 'HORA_ALTA' },
+    USER_NEW_DATA: { type: DataTypes.INTEGER, field: 'USER_NEW_DATA' },
 }, {
     tableName: 'PERSONAS', 
-    timestamps: false, 
-    freezeTableName: true,
+    timestamps: false,
 });
 
 module.exports = User;
