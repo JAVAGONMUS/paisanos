@@ -1,8 +1,7 @@
-// /app/models/Municipio.js
 const { DataTypes } = require('sequelize'); 
-const { sequelizeMySQL } = require('../config/databases');
+const { sequelizePostgres } = require('../config/databases'); // 👈 Rectificado
 
-const Municipio = sequelizeMySQL.define('Municipio', {
+const Municipio = sequelizePostgres.define('Municipio', {
     ID_MUN: {
         type: DataTypes.INTEGER,
         primaryKey: true,
