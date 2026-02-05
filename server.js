@@ -15,15 +15,15 @@ const Vehiculo = require('./models/Vehiculo');
 //const HistorialGPS = require('./models/HistorialGPS');
 //const HistorialViajes = require('./models/HistorialViajes');
 //const Viajes = require('./models/Viajes');
-const FilesPer = require('./models/FilesPer');
+//const FilesPer = require('./models/FilesPer');
 
 // Lista unificada de modelos para PostgreSQL
 const allModels = [
     User,
     Usuario,
     Driver,
-    Vehiculo,
-    FilesPer
+    Vehiculo
+    //FilesPer
     //HistorialGPS
     //HistorialViajes
     //Viajes    
