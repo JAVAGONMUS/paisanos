@@ -1,16 +1,13 @@
-// models/Dominio.js
 const { DataTypes } = require('sequelize');
-const { sequelizeMySQL } = require('../config/databases'); 
+const { sequelizePostgres } = require('../config/databases'); // 👈 Rectificado
 
-const Dominio = sequelizeMySQL.define('Dominio', {
-    // Llave primaria
+const Dominio = sequelizePostgres.define('Dominio', {
     ID_DOM: {
         type: DataTypes.INTEGER,
         primaryKey: true,
         autoIncrement: true,
         field: 'ID_DOM',
     },
-    
     NOMBRE_DOMINIO: { 
         type: DataTypes.STRING,
         allowNull: false,
