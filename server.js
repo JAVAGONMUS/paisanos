@@ -12,9 +12,10 @@ const User = require('./models/User');
 const Usuario = require('./models/Usuario');
 const Driver = require('./models/Driver');
 const Vehiculo = require('./models/Vehiculo');
-const HistorialGPS = require('./models/HistorialGPS');
-const HistorialViajes = require('./models/HistorialViajes');
-const Viajes = require('./models/Viajes');
+//const HistorialGPS = require('./models/HistorialGPS');
+//const HistorialViajes = require('./models/HistorialViajes');
+//const Viajes = require('./models/Viajes');
+const FilesPer = require('./models/FilesPer');
 
 // Lista unificada de modelos para PostgreSQL
 const allModels = [
@@ -22,9 +23,10 @@ const allModels = [
     Usuario,
     Driver,
     Vehiculo,
-    HistorialGPS,
-    HistorialViajes,
-    Viajes
+    FilesPer
+    //HistorialGPS
+    //HistorialViajes
+    //Viajes    
 ];
 
 const driverRoutes = require('./routes/driverRoutes'); 
