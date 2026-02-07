@@ -8,26 +8,27 @@ const Municipio = require('../models/Municipio');
 
 exports.setupAssociations = () => {
     // 1. Relación Usuario <-> Persona
-    // Un Usuario pertenece a una Persona (ID_PERSO)
     Usuario.belongsTo(User, { foreignKey: 'ID_PERSO', as: 'persona' });
     User.hasOne(Usuario, { foreignKey: 'ID_PERSO', as: 'cuenta' });
 
     // 2. Relación Driver <-> Persona
-    // Un Conductor es una Persona
     Driver.belongsTo(User, { foreignKey: 'ID_PERSO', as: 'datosPersonales' });
-    User.hasOne(Driver, { foreignKey: 'ID_PERSO' });
+    User.hasOne(Driver, { foreignKey: 'ID_PERSO', as: 'perfilConductor' });
 
-    // 3. Relación Driver <-> Vehiculo
-    // Un Conductor tiene un Vehículo asignado
-    Driver.belongsTo(Vehiculo, { foreignKey: 'ID_VEH' });
-    Vehiculo.hasOne(Driver, { foreignKey: 'ID_VEH' });
+    // 3. Relación Driver <-> Vehiculo (Corregida)
+    Driver.belongsTo(Vehiculo, { foreignKey: 'ID_VEH', as: 'vehiculoAsignado' });
+    Vehiculo.hasOne(Driver, { foreignKey: 'ID_VEH', as: 'conductorActual' });
 
-    // 4. Catálogos Geográficos
+    // 4. Catálogos Geográficos y Moneda
     Pais.hasMany(Departamento, { foreignKey: 'ID_PAIS', as: 'departamentos' });
-    Departamento.belongsTo(Pais, { foreignKey: 'ID_PAIS' });
+    Departamento.belongsTo(Pais, { foreignKey: 'ID_PAIS', as: 'pais' });
 
     Departamento.hasMany(Municipio, { foreignKey: 'ID_DEP', as: 'municipios' });
-    Municipio.belongsTo(Departamento, { foreignKey: 'ID_DEP' });
+    Municipio.belongsTo(Departamento, { foreignKey: 'ID_DEP', as: 'departamento' });
+
+    // Pais -> Driver (Para saber el símbolo de moneda automáticamente)
+    Pais.hasMany(Driver, { foreignKey: 'ID_PAIS' });
+    Driver.belongsTo(Pais, { foreignKey: 'ID_PAIS', as: 'paisOrigen' });
     
     return { User, Usuario, Driver, Vehiculo, Pais, Departamento, Municipio };
 };
