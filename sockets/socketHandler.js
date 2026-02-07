@@ -45,6 +45,18 @@ exports.initSocketIO = (io) => {
             const driverId = Object.keys(connectedDrivers).find(key => connectedDrivers[key] === socket.id);
             if (driverId) delete connectedDrivers[driverId];
         });
+
+        socket.on('cancelAcceptedTrip', ({ tripId, driverId }) => {
+            console.log(`❌ Viaje ${tripId} cancelado por Driver ${driverId}. Re-publicando...`);
+            
+            // 1. Buscar el viaje en nuestra lista de "activos pero asignados"
+            const tripIndex = activeTripRequests.findIndex(t => t.id === tripId);
+            if (tripIndex !== -1) {
+                activeTripRequests[tripIndex].status = 'WAITING';
+                // 2. Notificar a todos los conductores nuevamente (Vuelve a la lista en tiempo real)
+                global.io.to('drivers_pool').emit('newTripRequest', activeTripRequests[tripIndex]);
+            }
+        });
     });
 };
 
