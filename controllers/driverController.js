@@ -52,74 +52,59 @@ const updateLocation = async (req, res) => {
 const registerDriver = async (req, res) => {
     const { 
         nombres, apellidos, dpi, vencimientoDPI, licencia, 
-        vencimientoLicencia, nit, fechaNacimiento, telefono, 
-        celular, numeralDireccion, zonaDireccion, coloniaDireccion,
+        vencimientoLicencia, nit, fechaNacimiento, telefono, celular, 
+        numeralDireccion, zonaDireccion, coloniaDireccion,
         departamentoDireccion, municipioDireccion, 
-        emailPart1, password,
+        emailPart1, dominio1, emailPart2, dominio2, password,
         codigoVehiculo, placasVehiculo, tipoVehiculo, colorVehiculo, 
         aseguradoraVehiculo, idSeguroVehiculo, comentariosVehiculo
     } = req.body;
 
-    const dbVencimientoDPI = convertDateToDBFormat(vencimientoDPI);
-    const dbVencimientoLicencia = convertDateToDBFormat(vencimientoLicencia);
-    const dbFechaNacimiento = convertDateToDBFormat(fechaNacimiento);
+    const fullEmail1 = `${emailPart1}@${dominio1}`;
+    const fullEmail2 = emailPart2 && dominio2 ? `${emailPart2}@${dominio2}` : null;
 
-    const now = new Date();
-    const fechaAlta = now.toISOString().split('T')[0];
-    const horaAlta = now.toLocaleTimeString('en-US', { hour12: false });
-    
-    // Iniciamos transacción unificada en Postgres
     const t = await sequelizePostgres.transaction();
 
     try {
-        const existingPerson = await User.findOne({ 
-            where: { CORREO1: emailPart1 }, 
-            transaction: t 
-        });
-        
+        const existingPerson = await User.findOne({ where: { email1: fullEmail1 }, transaction: t });
         if (existingPerson) {
             await t.rollback();
             return res.status(409).json({ message: 'EL CORREO YA EXISTE.' });
         }
 
-        // 1. Crear Persona
         const newPerson = await User.create({
-            nombres, apellidos, dpi, vencimientoDPI: dbVencimientoDPI, 
-            licencia, vencimientoLicencia: dbVencimientoLicencia, nit,
-            fechaNacimiento: dbFechaNacimiento, telefono, celular, 
+            nombres, apellidos, dpi, vencimientoDPI: convertDateToDBFormat(vencimientoDPI), 
+            licencia, vencimientoLicencia: convertDateToDBFormat(vencimientoLicencia), nit,
+            fechaNacimiento: convertDateToDBFormat(fechaNacimiento), telefono, celular, 
             numeralDireccion, zonaDireccion, coloniaDireccion, 
-            departamentoDireccion, municipioDireccion, email1: emailPart1,
-            FECHA_ALTA: fechaAlta, HORA_ALTA: horaAlta, USER_NEW_DATA: 0
+            departamentoDireccion, municipioDireccion, 
+            email1: fullEmail1, email2: fullEmail2, // Se guardan ambos correos concatenados
+            FECHA_ALTA: new Date(), HORA_ALTA: new Date().toLocaleTimeString('en-US', { hour12: false }), 
+            USER_NEW_DATA: 0
         }, { transaction: t });
 
-        // 2. Crear Usuario
         const hashedPassword = await bcrypt.hash(password, 10);
         await Usuario.create({
             ID_PERSO: newPerson.ID_PERSO, ID_PER: 3, ESTADO: 0, 
-            USUARIO: emailPart1, PASSWORD: hashedPassword, 
-            FECHA_ALTA: fechaAlta, HORA_ALTA: horaAlta, USER_NEW_DATA: 0
+            USUARIO: fullEmail1, PASSWORD: hashedPassword, 
+            FECHA_ALTA: new Date(), HORA_ALTA: new Date().toLocaleTimeString('en-US', { hour12: false }), 
+            USER_NEW_DATA: 0
         }, { transaction: t });
         
-        // 3. Crear Vehículo
         const newVehiculo = await Vehiculo.create({
             CODIGO: codigoVehiculo, PLACAS: placasVehiculo, TIPO: tipoVehiculo,
             COLOR: colorVehiculo, ESTADO: 0, ASEGURADORA: aseguradoraVehiculo,
             ID_SEGURO: idSeguroVehiculo, COMENTARIOS: comentariosVehiculo
         }, { transaction: t });
 
-        // 4. Crear Conductor
         await Driver.create({
-            ID_PERSO: newPerson.ID_PERSO, 
-            ID_VEH: newVehiculo.ID_VEH, 
-            STATUS: false, 
-            IS_ONLINE: false
+            ID_PERSO: newPerson.ID_PERSO, ID_VEH: newVehiculo.ID_VEH, STATUS: false, IS_ONLINE: false
         }, { transaction: t });
         
         await t.commit();
-        res.status(201).json({ message: 'Registro exitoso. En espera de aprobación.' });
+        res.status(201).json({ message: 'Registro exitoso.' });
     } catch (error) {
         if (t) await t.rollback();
-        console.error('Error en Registro:', error);
         res.status(500).json({ message: 'Error interno en registro.' });
     }
 };
