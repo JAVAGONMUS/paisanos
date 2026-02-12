@@ -49,15 +49,17 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST"],
+        credentials: true
     },
-    connectTimeout: 45000,
-    pingTimeout: 30000,
+    transports: ['websocket', 'polling'], 
+    allowEIO3: true,
+    connectTimeout: 60000,
+    pingTimeout: 60000,
     pingInterval: 25000
 });
 
 global.io = io;
-
 app.use(express.json());
 
 // Rutas API
@@ -78,7 +80,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 async function startServer() {
     try {
