@@ -35,7 +35,10 @@ const pool = new Pool({
   password: process.env.PG_DB_PASSWORD,
   database: process.env.PG_DB_NAME,
   port: process.env.PG_DB_PORT,
-  ssl: sslConfig
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false // Esto permite la conexión SSL aunque el certificado sea de TigerData
+  }
 });
 
 module.exports = {
