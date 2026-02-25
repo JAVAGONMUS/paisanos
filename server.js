@@ -59,6 +59,10 @@ const io = new Server(server, {
     pingInterval: 25000
 });
 
+app.get('/healthcheck', (req, res) => {
+  res.status(200).send('OK');
+});
+
 global.io = io;
 app.use(express.json());
 
