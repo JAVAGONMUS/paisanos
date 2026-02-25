@@ -149,10 +149,10 @@ const loginDriver = async (req, res) => {
             success: true, 
             token, 
             driver: { 
-                id: driver.ID_COND, 
+                id_cond: driver.ID_COND, // Usar el nombre exacto que espera el mapeo del frontend
                 id_uss: userCredentials.ID_PERSO,
                 placas: driver.Vehiculo ? driver.Vehiculo.PLACAS : "P-PENDIENTE",
-                permisos_aceptados: driver.PERMISOS_ACEPTADOS
+                permisos_aceptados: driver.PERMISOS_ACEPTADOS ? 'true' : 'false'
             } 
         });
     } catch (error) {
