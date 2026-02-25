@@ -14,7 +14,10 @@ const sequelizePostgres = process.env.DATABASE_URL
       dialect: 'postgres',
       logging: false,
       dialectOptions: {
-        ssl: sslConfig
+        ssl: {
+          require: true,
+          rejectUnauthorized: false // Necesario para conexiones externas como TigerData/Render
+        }
       },
       define: {
         freezeTableName: true
