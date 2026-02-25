@@ -1,3 +1,5 @@
+//../sockets/socketHandler.js
+
 const { pool } = require('../config/databases'); 
 const geoService = require('../services/geoValidation');
 
@@ -43,22 +45,21 @@ exports.initSocketIO = (io) => {
         });
 
         socket.on('updateLocation', async (data) => {
-            const { driverId, lat, lon } = data;
+            const { driverId, lat, lon, isOnline } = data;
             if (!driverId || !lat || !lon) return;
 
             try {
-                // Validación Geográfica (PostGIS/GeoService)
                 const validacion = await geoService.verSectorMapaGps(lat, lon);
                 
-                // Actualización de coordenadas en TigerData
+                // Actualización masiva: Lat, Lon y aseguramos que IS_ONLINE sea true
                 await pool.query(
-                  'UPDATE "CONDUCTORES" SET "UBICACION_LAT" = $1, "UBICACION_LON" = $2 WHERE "ID_COND" = $3',
-                  [lat, lon, driverId]
+                  'UPDATE "CONDUCTORES" SET "UBICACION_LAT" = $1, "UBICACION_LON" = $2, "IS_ONLINE" = $3 WHERE "ID_COND" = $4',
+                  [lat, lon, isOnline !== undefined ? isOnline : true, driverId]
                 );
 
                 if (!validacion.enZona) {
                     console.warn(`⚠️ Driver ${driverId} fuera de zona.`);
-                    socket.emit('forced_logout', { mensaje: 'Estás fuera de la zona autorizada de PAISANOS.' });
+                    socket.emit('forced_logout', { mensaje: 'Fuera de zona autorizada.' });
                     await pool.query('UPDATE "CONDUCTORES" SET "IS_ONLINE" = false WHERE "ID_COND" = $1', [driverId]);
                     socket.leave('drivers_pool');
                     return; 
@@ -69,7 +70,7 @@ exports.initSocketIO = (io) => {
                     timestamp: new Date()
                 });
             } catch (error) { 
-                console.error("❌ Error en updateLocation:", error.message); 
+                console.error("❌ Error TigerData updateLocation:", error.message); 
             }
         });
 
