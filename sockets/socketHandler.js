@@ -1,35 +1,45 @@
 const { pool } = require('../config/databases'); 
 const geoService = require('../services/geoValidation');
 
-const connectedDrivers = {}; 
-// MEMORIA VOLÁTIL PARA SOLICITUDES ACTIVAS (Escalabilidad rápida)
+// Usamos Map para mejor rendimiento en búsquedas/borrados que un objeto simple
+const connectedDrivers = new Map(); 
 let activeTripRequests = [];
 
 exports.initSocketIO = (io) => {
+    // Hacemos que io sea accesible globalmente si no lo estaba
+    global.io = io;
+
     io.on('connection', (socket) => {
+        console.log(`🔌 Nuevo dispositivo conectado: ${socket.id}`);
         
         socket.on('driverConnect', async ({ driverId }) => {
-            if (driverId) {
-                socket.join(`driver_${driverId}`);
-                socket.join('drivers_pool');
-                connectedDrivers[driverId] = socket.id;
-                
-                // ACTUALIZACIÓN CRÍTICA: Al conectar, marcar como ONLINE
-                try {
-                    await pool.query(
-                        'UPDATE "CONDUCTORES" SET "IS_ONLINE" = true WHERE "ID_COND" = $1', 
-                        [driverId]
-                    );
-                } catch (e) { console.error("Error al poner online:", e); }
+            if (!driverId) return;
 
-                socket.emit('initialTripRequests', activeTripRequests);
+            // 1. Limpieza de conexiones previas del mismo conductor (Evita duplicados)
+            if (connectedDrivers.has(driverId)) {
+                const oldSocketId = connectedDrivers.get(driverId);
+                const oldSocket = io.sockets.sockets.get(oldSocketId);
+                if (oldSocket) oldSocket.leave('drivers_pool');
             }
-        });
 
-        // ESCUCHAR CUANDO UN CONDUCTOR RECHAZA (Para limpiar su vista local si es necesario)
-        socket.on('rejectTrip', ({ tripId, driverId }) => {
-            // Lógica para marcar que este conductor no quiere ver este viaje
-            socket.emit('removeTripFromList', tripId);
+            // 2. Unirse a salas
+            socket.join(`driver_${driverId}`);
+            socket.join('drivers_pool');
+            connectedDrivers.set(driverId, socket.id);
+            
+            console.log(`✅ Conductor ${driverId} unido a salas y pool.`);
+
+            // 3. Actualización en TigerData (IS_ONLINE)
+            try {
+                await pool.query(
+                    'UPDATE "CONDUCTORES" SET "IS_ONLINE" = true WHERE "ID_COND" = $1', 
+                    [driverId]
+                );
+                // Enviamos los viajes pendientes solo a este conductor que entra
+                socket.emit('initialTripRequests', activeTripRequests);
+            } catch (e) { 
+                console.error("❌ Error en DB al conectar conductor:", e.message); 
+            }
         });
 
         socket.on('updateLocation', async (data) => {
@@ -37,54 +47,84 @@ exports.initSocketIO = (io) => {
             if (!driverId || !lat || !lon) return;
 
             try {
+                // Validación Geográfica (PostGIS/GeoService)
                 const validacion = await geoService.verSectorMapaGps(lat, lon);
                 
-                // ACTUALIZAR POSICIÓN EN LA TABLA CONDUCTORES
+                // Actualización de coordenadas en TigerData
                 await pool.query(
                   'UPDATE "CONDUCTORES" SET "UBICACION_LAT" = $1, "UBICACION_LON" = $2 WHERE "ID_COND" = $3',
                   [lat, lon, driverId]
                 );
 
                 if (!validacion.enZona) {
-                    socket.emit('forced_logout', { mensaje: 'Estás fuera de la zona autorizada.' });
+                    console.warn(`⚠️ Driver ${driverId} fuera de zona.`);
+                    socket.emit('forced_logout', { mensaje: 'Estás fuera de la zona autorizada de PAISANOS.' });
                     await pool.query('UPDATE "CONDUCTORES" SET "IS_ONLINE" = false WHERE "ID_COND" = $1', [driverId]);
+                    socket.leave('drivers_pool');
                     return; 
                 }
                 
-                socket.emit('locationUpdateSuccess', { zona: validacion.zona?.NOMBRE || 'Zona Activa' });
-            } catch (error) { console.error("Error en updateLocation:", error); }
-        });
-
-        socket.on('disconnect', async () => {
-            const driverId = Object.keys(connectedDrivers).find(key => connectedDrivers[key] === socket.id);
-            if (driverId) {
-                // Al desconectar, marcar como offline
-                await pool.query('UPDATE "CONDUCTORES" SET "IS_ONLINE" = false WHERE "ID_COND" = $1', [driverId]);
-                delete connectedDrivers[driverId];
+                socket.emit('locationUpdateSuccess', { 
+                    zona: validacion.zona?.NOMBRE || 'Zona Activa',
+                    timestamp: new Date()
+                });
+            } catch (error) { 
+                console.error("❌ Error en updateLocation:", error.message); 
             }
         });
 
+        socket.on('rejectTrip', ({ tripId }) => {
+            // El conductor no quiere ver este viaje, se lo quitamos de SU vista
+            socket.emit('removeTripFromList', tripId);
+        });
+
         socket.on('cancelAcceptedTrip', ({ tripId, driverId }) => {
-            console.log(`❌ Viaje ${tripId} cancelado por Driver ${driverId}. Re-publicando...`);
+            console.log(`❌ Viaje ${tripId} rechazado tras aceptación por Driver ${driverId}.`);
             
-            // 1. Buscar el viaje en nuestra lista de "activos pero asignados"
             const tripIndex = activeTripRequests.findIndex(t => t.id === tripId);
             if (tripIndex !== -1) {
                 activeTripRequests[tripIndex].status = 'WAITING';
-                // 2. Notificar a todos los conductores nuevamente (Vuelve a la lista en tiempo real)
-                global.io.to('drivers_pool').emit('newTripRequest', activeTripRequests[tripIndex]);
+                // Notificar a todo el pool para que alguien más lo tome
+                io.to('drivers_pool').emit('newTripRequest', activeTripRequests[tripIndex]);
+            }
+        });
+
+        socket.on('disconnect', async () => {
+            // Buscamos al driverId por el ID del socket
+            let disconnectedDriverId = null;
+            for (let [id, sId] of connectedDrivers.entries()) {
+                if (sId === socket.id) {
+                    disconnectedDriverId = id;
+                    break;
+                }
+            }
+
+            if (disconnectedDriverId) {
+                console.log(`👋 Conductor ${disconnectedDriverId} desconectado.`);
+                try {
+                    await pool.query('UPDATE "CONDUCTORES" SET "IS_ONLINE" = false WHERE "ID_COND" = $1', [disconnectedDriverId]);
+                    connectedDrivers.delete(disconnectedDriverId);
+                } catch (e) {
+                    console.error("Error al marcar offline en desconexión:", e.message);
+                }
             }
         });
     });
 };
 
+// Función para cuando un cliente crea un viaje desde el controlador de rutas
 exports.broadcastNewTrip = (tripData) => {
     const newTrip = {
         ...tripData,
-        timestamp: Date.now(), // Para ordenarlos por antigüedad
+        timestamp: Date.now(),
         status: 'WAITING'
     };
+    
+    // Evitar duplicados en la lista de activos
+    activeTripRequests = activeTripRequests.filter(t => t.id !== tripData.id);
     activeTripRequests.push(newTrip);
-    // Notificar a todos en la sala de ventas
-    global.io.to('drivers_pool').emit('newTripRequest', newTrip);
+
+    if (global.io) {
+        global.io.to('drivers_pool').emit('newTripRequest', newTrip);
+    }
 };
