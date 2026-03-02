@@ -1,3 +1,5 @@
+//  ../services/mapboxService.js
+
 const axios = require('axios');
 
 /**
@@ -5,10 +7,9 @@ const axios = require('axios');
  */
 const obtenerTiempoRealLlegada = async (latOrigen, lngOrigen, latDestino, lngDestino) => {
     // Extraemos el token desde las variables de entorno
-    const MAPBOX_TOKEN = process.env.MAPBOX_ACCESS_TOKEN;
-    
+    const MAPBOX_TOKEN = process.env.MAPBOX_SECRET_TOKEN;
     if (!MAPBOX_TOKEN) {
-        console.error("❌ ERROR: MAPBOX_ACCESS_TOKEN no definido en .env");
+        console.error("❌ ERROR:MAPBOX_SECRET_TOKEN no definido en .env");
         return null;
     }
 
