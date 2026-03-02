@@ -1,3 +1,5 @@
+//    ../controllers/driverController.js
+
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const Driver = require('../models/Driver');   
@@ -149,10 +151,10 @@ const loginDriver = async (req, res) => {
             success: true, 
             token, 
             driver: { 
-                id_cond: driver.ID_COND, // Usar el nombre exacto que espera el mapeo del frontend
+                id_cond: driver.ID_COND, 
                 id_uss: userCredentials.ID_PERSO,
                 placas: driver.Vehiculo ? driver.Vehiculo.PLACAS : "P-PENDIENTE",
-                permisos_aceptados: driver.PERMISOS_ACEPTADOS ? 'true' : 'false'
+                permisos_aceptados: !!driver.PERMISOS_ACEPTADOS 
             } 
         });
     } catch (error) {
