@@ -1,3 +1,5 @@
+//   ../services/geoValidation.js
+
 const { pool } = require('../config/databases');
 
 /**
@@ -5,6 +7,9 @@ const { pool } = require('../config/databases');
  * Optimizado para Mapbox (WGS84 EPSG:4326)
  */
 const verSectorMapaGps = async (lat, lng) => {
+  if (lat < 13 || lat > 19 || lng < -93 || lng > -87) {
+    return { enZona: false, zona: null, mensaje: "Coordenadas fuera de Guatemala" };
+  }
   // Validación de integridad de datos
   if (lat === undefined || lng === undefined || lat === null || lng === null) {
       return { enZona: false, zona: null };
@@ -32,7 +37,7 @@ const verSectorMapaGps = async (lat, lng) => {
       LIMIT 1;
     `;
     
-    // Log de auditoría para Railway
+    // Log de auditoría para Render
     console.log(`📍 [PAISANOS GPS] Validando -> Long: ${lng}, Lat: ${lat}`);
 
     // Ejecución de la consulta: $1 = Longitude (X), $2 = Latitude (Y)
