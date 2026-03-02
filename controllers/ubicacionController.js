@@ -1,6 +1,8 @@
+//../controllers/ubicacionController.js
+
 const Departamento = require('../models/Departamento');
 const Municipio = require('../models/Municipio'); 
-const { pool } = require('../config/databases'); // Solo necesitamos el pool de Postgres
+const { pool } = require('../config/databases'); 
 const { QueryTypes } = require('sequelize');
 
 const DEFAULT_COUNTRY_ID = process.env.DEFAULT_COUNTRY_ID; 
