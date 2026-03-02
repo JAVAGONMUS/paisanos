@@ -1,3 +1,5 @@
+//  ../middlewares/geoFenceMiddleware.js
+
 const geoService = require('../services/geoValidation');
 const Driver = require('../models/Driver');
 
@@ -24,8 +26,8 @@ const geoFenceGuard = async (req, res, next) => {
             // B. CORTAR SOCKET: Si tienes acceso al objeto global io
             if (global.io) {
                 // Buscamos el socket del conductor y lo desconectamos
-                const socketId = `driver_${id}`; 
-                global.io.to(socketId).emit('forced_logout', { 
+                const socketRoom = `driver_room_${id}`; 
+                global.io.to(socketRoom).emit('forced_logout', { 
                     reason: 'FUERA_DE_RANGO',
                     mensaje: 'Has salido del área de servicio de PAISANOS.' 
                 });
