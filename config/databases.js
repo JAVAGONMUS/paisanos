@@ -1,3 +1,4 @@
+//archivo backend ../config/databases.js
 const { Sequelize } = require('sequelize');
 const { Pool } = require('pg');
 require('dotenv').config();
