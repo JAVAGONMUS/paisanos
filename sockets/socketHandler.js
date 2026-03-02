@@ -2,6 +2,7 @@
 
 const { pool } = require('../config/databases'); 
 const geoService = require('../services/geoValidation');
+const Driver = require('../models/Driver');
 
 // Usamos Map para mejor rendimiento en búsquedas/borrados que un objeto simple
 const connectedDrivers = new Map(); 
@@ -25,7 +26,7 @@ exports.initSocketIO = (io) => {
             }
 
             // 2. Unirse a salas
-            socket.join(`driver_${driverId}`);
+            socket.join(`driver_room_${driverId}`); // Usa un prefijo claro
             socket.join('drivers_pool');
             connectedDrivers.set(driverId, socket.id);
             
@@ -59,7 +60,10 @@ exports.initSocketIO = (io) => {
 
                 if (!validacion.enZona) {
                     console.warn(`⚠️ Driver ${driverId} fuera de zona.`);
-                    socket.emit('forced_logout', { mensaje: 'Fuera de zona autorizada.' });
+                    socket.emit('forced_logout', { 
+                        reason: 'FUERA_DE_RANGO', // Añade este campo
+                        mensaje: 'Has salido del área de servicio de PAISANOS.' 
+                    });
                     await pool.query('UPDATE "CONDUCTORES" SET "IS_ONLINE" = false WHERE "ID_COND" = $1', [driverId]);
                     socket.leave('drivers_pool');
                     return; 
