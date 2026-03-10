@@ -1,5 +1,3 @@
-//../sockets/socketHandler.js
-
 const { pool } = require('../config/databases'); 
 const geoService = require('../services/geoValidation');
 const Driver = require('../models/Driver');
