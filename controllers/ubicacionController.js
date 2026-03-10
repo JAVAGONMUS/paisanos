@@ -1,12 +1,12 @@
 //../controllers/ubicacionController.js
-
 const Departamento = require('../models/Departamento');
-const Municipio = require('../models/Municipio'); 
-const { pool } = require('../config/databases'); 
+const Municipio = require('../models/Municipio');
+const { pool } = require('../config/databases');
 const { QueryTypes } = require('sequelize');
+const ZonaServicio = require('../models/ZonaServicio');
+const { sequelizePostgres } = require('../config/databases');
 
-const DEFAULT_COUNTRY_ID = process.env.DEFAULT_COUNTRY_ID; 
-
+const DEFAULT_COUNTRY_ID = process.env.DEFAULT_COUNTRY_ID;
 /**
  * Obtiene el catálogo de departamentos y municipios
  */
@@ -14,13 +14,13 @@ const getUbicaciones = async (req, res) => {
     if (!DEFAULT_COUNTRY_ID) {
         return res.status(500).json({ message: 'Error: DEFAULT_COUNTRY_ID no configurado.' });
     }
-    try {        
+    try {
         const departamentos = await Departamento.findAll({
             where: { ID_PAIS: DEFAULT_COUNTRY_ID },
-            attributes: ['ID_DEP', 'NOMBRE', 'CODIGO'], 
+            attributes: ['ID_DEP', 'NOMBRE', 'CODIGO'],
             include: [{
                 model: Municipio,
-                as: 'municipios', 
+                as: 'municipios',
                 attributes: ['ID_MUN', 'NOMBRE'],
             }],
             order: [['NOMBRE', 'ASC']],
@@ -31,30 +31,23 @@ const getUbicaciones = async (req, res) => {
         res.status(500).json({ message: 'Error interno.' });
     }
 };
-
 /**
  * Actualiza la ubicación actual UNICAMENTE en Postgres
  * Esta función corre cada 5 segundos.
  */
 const actualizarUbicacionConductor = async (req, res) => {
-    const { 
-        lat, lon, 
-        id_cond, 
-        velocidad 
+    const {
+        lat, lon,
+        id_cond,
+        velocidad
     } = req.body;
-
-    // Log de monitoreo limpio (Ya no imprimimos ID_USS porque no es necesario aquí)
     console.log(`📡 Rastreo -> Lat: ${lat}, Lon: ${lon}, ID_COND: ${id_cond}`);
-
     if (!lat || !lon || !id_cond) {
         return res.status(400).json({ message: "Faltan parámetros", recibido: req.body });
     }
-
     let client;
-
     try {
         client = await pool.connect();
-
         // --- UNICA RESPONSABILIDAD: POSTGRESQL (Estado en Tiempo Real) ---
         const updateQuery = `
             UPDATE "CONDUCTORES" 
@@ -65,22 +58,18 @@ const actualizarUbicacionConductor = async (req, res) => {
                 "UPDATED_AT" = NOW()
             WHERE "ID_COND" = $4
         `;
-        
         await client.query(updateQuery, [
-            parseFloat(lat), 
-            parseFloat(lon), 
-            parseFloat(velocidad || 0), 
+            parseFloat(lat),
+            parseFloat(lon),
+            parseFloat(velocidad || 0),
             id_cond
         ]);
-
         // Ya no insertamos en HISTORIAL_LOGIN aquí. 
         // Eso se hace en driverController.js al momento del Login y Logout.
-
-        res.status(200).json({ 
-            success: true, 
-            message: "Ubicación actualizada en Postgres" 
+        res.status(200).json({
+            success: true,
+            message: "Ubicación actualizada en Postgres"
         });
-
     } catch (error) {
         console.error("❌ ERROR EN RASTREO POSTGRES:", error.message);
         res.status(500).json({ success: false, error: error.message });
@@ -88,8 +77,38 @@ const actualizarUbicacionConductor = async (req, res) => {
         if (client) client.release();
     }
 };
+const obtenerZonaPorUbicacion = async (req, res) => {
+    const { lat, lon } = req.query;
 
+    try {
+        const zona = await sequelizePostgres.query(`
+            SELECT "ID_ZONAS", "NOMBRE", ST_AsGeoJSON("GEOMETRIA") as geojson, "ACTIVO"
+            FROM "ZONAS_SERVICIO"
+            WHERE ST_Contains("GEOMETRIA", ST_SetSRID(ST_Point($1, $2), 4326))
+            AND "ACTIVO" = true
+            LIMIT 1
+        `, {
+            bind: [parseFloat(lon), parseFloat(lat)],
+            type: sequelizePostgres.QueryTypes.SELECT
+        });
+
+        if (zona.length > 0) {
+            const feature = {
+                type: 'Feature',
+                properties: { nombre: zona[0].NOMBRE, id: zona[0].ID_ZONAS },
+                geometry: JSON.parse(zona[0].geojson)
+            };
+            return res.json({ success: true, zona: feature });
+        }
+
+        res.json({ success: false, message: "Fuera de zona autorizada" });
+    } catch (error) {
+        console.error("Error PostGIS:", error);
+        res.status(500).json({ error: "Error al validar geocerca" });
+    }
+};
 module.exports = {
     getUbicaciones,
-    actualizarUbicacionConductor
+    actualizarUbicacionConductor,
+    obtenerZonaPorUbicacion
 };
