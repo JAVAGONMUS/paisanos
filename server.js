@@ -1,7 +1,11 @@
+//   ../server.js
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { Op } = require('sequelize'); 
+const Driver = require('./models/Driver');
+const Usuario = require('./models/Usuario');
 require('dotenv').config();
 
 const { authenticateDBs } = require('./config/databases'); 
@@ -113,33 +117,20 @@ async function startServer() {
             
             // --- LIMPIADOR DE INACTIVIDAD (Cierra sesiones muertas) ---
             setInterval(async () => {
-                try {
-                    const MINUTOS_LIMITE = 5;
-                    const tiempoCorte = new Date(Date.now() - (MINUTOS_LIMITE * 60 * 1000));
-                    
-                    const conductoresAfectados = await Driver.findAll({
-                        where: {
-                            IS_ONLINE: true,
-                            UPDATED_AT: { [Op.lt]: tiempoCorte }
-                        }
-                    });
+                console.log("Cleaning inactive sessions...");
+                const threshold = new Date(Date.now() - 5 * 60 * 1000); // 5 minutos de inactividad
+                
+                const inactiveDrivers = await Driver.findAll({
+                    where: { IS_ONLINE: true, UPDATED_AT: { [Op.lt]: threshold } }
+                });
 
-                    if (conductoresAfectados.length > 0) {
-                        const ids = conductoresAfectados.map(d => d.ID_COND);
-                        await Driver.update({ IS_ONLINE: false }, { where: { ID_COND: ids } });
-                        
-                        console.log(`🧹 [AUTO-OFFLINE] ${ids.length} conductores por inactividad.`);
-                            
-                        ids.forEach(id => {
-                            global.io.to(`driver_${id}`).emit('force_reconnect', { 
-                                reason: 'Inactividad de pulso GPS' 
-                            });
-                        });
-                    }
-                } catch (error) {
-                    console.error("❌ Error en limpiador:", error);
+                for (const d of inactiveDrivers) {
+                    await d.update({ IS_ONLINE: false });
+                    // Cambiar estado de usuario a 22 o 25 (Salida por sistema)
+                    await Usuario.update({ ESTADO: 25 }, { where: { ID_PERSO: d.ID_PERSO } });
+                    console.log(`Sesión cerrada por inactividad: Driver ID ${d.ID_COND}`);
                 }
-            }, 2 * 60 * 1000); // Se ejecuta cada 2 minutos
+            }, 60000);
         });
     } catch (err) {
         console.error('❌ Error fatal al iniciar el servidor:', err);
