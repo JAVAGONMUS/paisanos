@@ -4,8 +4,6 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const { Op } = require('sequelize'); 
-const Driver = require('./models/Driver');
-const Usuario = require('./models/Usuario');
 require('dotenv').config();
 
 const { authenticateDBs } = require('./config/databases'); 
