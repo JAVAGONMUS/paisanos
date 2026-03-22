@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const { sequelizePostgres } = require('../config/databases'); // 👈 Cambiado a Postgres
+const { sequelizePostgres } = require('../config/databases');
 
 const User = sequelizePostgres.define('User', {
     ID_PERSO: {
