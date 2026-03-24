@@ -1,3 +1,5 @@
+//   ../routes/catalogsRoutes.js
+
 const express = require('express');
 const router = express.Router();
 // Importa el controlador de catálogos
