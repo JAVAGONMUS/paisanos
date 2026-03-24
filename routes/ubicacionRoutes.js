@@ -1,13 +1,15 @@
 const express = require('express');
 const router = express.Router();
-// Importación limpia de ambas funciones desde el controlador
-const { getUbicaciones, actualizarUbicacionConductor } = require('../controllers/ubicacionController');
-// Corregido: Debe ser verifyToken para coincidir con tu authMiddleware.js
-const verifyToken = require('../middlewares/authMiddleware');
 const ubicacionController = require('../controllers/ubicacionController');
-// Obtener catálogo de departamentos/municipios
-router.get('/ubicaciones', getUbicaciones);
-// Actualizar ubicación actual (Ruta protegida para el GPS)
-router.post('/update-location', verifyToken, actualizarUbicacionConductor);
+const verifyToken = require('../middlewares/authMiddleware');
+
+// Obtener departamentos y municipios
+router.get('/ubicaciones', verifyToken, ubicacionController.getUbicaciones);
+
+// Actualizar GPS crudo en Postgres
+router.post('/actualizar', verifyToken, ubicacionController.actualizarUbicacionConductor);
+
+// Punto 11: Obtener la Geocerca Dinámica según el GPS del conductor
 router.get('/zona-activa', verifyToken, ubicacionController.obtenerZonaPorUbicacion);
+
 module.exports = router;
