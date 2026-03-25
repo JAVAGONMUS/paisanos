@@ -1,3 +1,5 @@
+//   ../controllers/catalogsController.js
+
 const Dominio = require('../models/Dominio');
 
 exports.getDomains = async (req, res) => {
