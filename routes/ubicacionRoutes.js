@@ -7,7 +7,7 @@ let verifyToken = require('../middlewares/authMiddleware');
 if (typeof verifyToken === 'object' && verifyToken.verifyToken) verifyToken = verifyToken.verifyToken;
 
 // 1. Obtener departamentos y municipios
-router.get('/ubicaciones', verifyToken, ubicacionController.getUbicaciones);
+router.get('/ubicaciones', ubicacionController.getUbicaciones);
 
 // 2. Actualizar GPS crudo en Postgres
 router.post('/actualizar', verifyToken, ubicacionController.actualizarUbicacionConductor);
