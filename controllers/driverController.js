@@ -128,12 +128,13 @@ const loginDriver = async (req, res) => {
         let nuevoEstado = userCredentials.ESTADO;
         if ([21, 22].includes(userCredentials.ESTADO)) nuevoEstado = 23;
         if ([24, 25].includes(userCredentials.ESTADO)) nuevoEstado = 26;
-        await userCredentials.update({ ESTADO: nuevoEstado });
+        await userCredentials.update({ ESTADO: nuevoEstado });        
         await driver.update({
             IS_ONLINE: true,
-            PERMISOS_ACEPTADOS: permisosDispositivo === true,
+            PERMISOS_ACEPTADOS: permisosDispositivo === true, 
             UBICACION_LAT: lat,
-            UBICACION_LON: lon
+            UBICACION_LON: lon,
+            UPDATED_AT: new Date()
         });
         // Auditoría en Postgres usando Pool (SQL Crudo)
         const lugarFormateado = `${driver.ID_COND}//${lat || 0}//${lon || 0}`;
