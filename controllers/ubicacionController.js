@@ -79,13 +79,15 @@ const actualizarUbicacionConductor = async (req, res) => {
 };
 const obtenerZonaPorUbicacion = async (req, res) => {
     const { lat, lon } = req.query;
+
     try {
-        // Aseguramos precisión con ST_SetSRID y ST_Contains
+        // RECTIFICACIÓN: Ordenamos por NIVEL (ASC) para priorizar Nivel 1 sobre los demás
         const zona = await sequelizePostgres.query(`
-            SELECT "ID_ZONAS", "NOMBRE", ST_AsGeoJSON("GEOMETRIA") as geojson, "ACTIVO"
+            SELECT "ID_ZONAS", "NOMBRE", ST_AsGeoJSON("GEOMETRIA") as geojson, "ACTIVO", "NIVEL"
             FROM "ZONAS_SERVICIO"
             WHERE ST_Contains("GEOMETRIA", ST_SetSRID(ST_Point($1, $2), 4326))
             AND "ACTIVO" = true
+            ORDER BY "NIVEL" ASC
             LIMIT 1
         `, {
             bind: [parseFloat(lon), parseFloat(lat)],
@@ -97,17 +99,18 @@ const obtenerZonaPorUbicacion = async (req, res) => {
                 type: 'Feature',
                 properties: { 
                     nombre: zona[0].NOMBRE, 
-                    id: zona[0].ID_ZONAS 
+                    id: zona[0].ID_ZONAS,
+                    nivel: zona[0].NIVEL
                 },
                 geometry: JSON.parse(zona[0].geojson)
             };
-            // Retornamos éxito total
+            console.log(`✅ Conductor en zona: ${zona[0].NOMBRE} (Nivel ${zona[0].NIVEL})`);
             return res.json({ success: true, zona: feature });
         }
 
         res.json({ success: false, message: "Fuera de zona autorizada" });
     } catch (error) {
-        console.error("Error PostGIS:", error);
+        console.error("❌ Error PostGIS con Niveles:", error);
         res.status(500).json({ error: "Error al validar geocerca" });
     }
 };
