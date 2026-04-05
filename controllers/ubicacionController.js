@@ -81,7 +81,7 @@ const obtenerZonaPorUbicacion = async (req, res) => {
     const { lat, lon } = req.query;
 
     try {
-        // RECTIFICACIÓN: Ordenamos por NIVEL (ASC) para priorizar Nivel 1 sobre los demás
+        // PRIORIDAD DE NIVELES: ST_Contains + Orden por NIVEL
         const zona = await sequelizePostgres.query(`
             SELECT "ID_ZONAS", "NOMBRE", ST_AsGeoJSON("GEOMETRIA") as geojson, "ACTIVO", "NIVEL"
             FROM "ZONAS_SERVICIO"
@@ -95,6 +95,7 @@ const obtenerZonaPorUbicacion = async (req, res) => {
         });
 
         if (zona.length > 0) {
+            // Construimos un Feature GeoJSON válido
             const feature = {
                 type: 'Feature',
                 properties: { 
@@ -104,14 +105,13 @@ const obtenerZonaPorUbicacion = async (req, res) => {
                 },
                 geometry: JSON.parse(zona[0].geojson)
             };
-            console.log(`✅ Conductor en zona: ${zona[0].NOMBRE} (Nivel ${zona[0].NIVEL})`);
             return res.json({ success: true, zona: feature });
         }
 
         res.json({ success: false, message: "Fuera de zona autorizada" });
     } catch (error) {
-        console.error("❌ Error PostGIS con Niveles:", error);
-        res.status(500).json({ error: "Error al validar geocerca" });
+        console.error("Error PostGIS:", error);
+        res.status(500).json({ error: "Fallo en validación de sector" });
     }
 };
 module.exports = {
