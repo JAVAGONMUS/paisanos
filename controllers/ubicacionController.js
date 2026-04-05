@@ -79,8 +79,8 @@ const actualizarUbicacionConductor = async (req, res) => {
 };
 const obtenerZonaPorUbicacion = async (req, res) => {
     const { lat, lon } = req.query;
-
     try {
+        // Aseguramos precisión con ST_SetSRID y ST_Contains
         const zona = await sequelizePostgres.query(`
             SELECT "ID_ZONAS", "NOMBRE", ST_AsGeoJSON("GEOMETRIA") as geojson, "ACTIVO"
             FROM "ZONAS_SERVICIO"
@@ -95,9 +95,13 @@ const obtenerZonaPorUbicacion = async (req, res) => {
         if (zona.length > 0) {
             const feature = {
                 type: 'Feature',
-                properties: { nombre: zona[0].NOMBRE, id: zona[0].ID_ZONAS },
+                properties: { 
+                    nombre: zona[0].NOMBRE, 
+                    id: zona[0].ID_ZONAS 
+                },
                 geometry: JSON.parse(zona[0].geojson)
             };
+            // Retornamos éxito total
             return res.json({ success: true, zona: feature });
         }
 
