@@ -100,7 +100,7 @@ const registerDriver = async (req, res) => {
  * LOGIN DE CONDUCTOR (Auditoría vía Pool)
  */
 const loginDriver = async (req, res) => {
-    const { username, password, intento, lat, lon, permisosDispositivo } = req.body;
+    const { username, password, intento, lat, lon, permisosDispositivo } = req.body;     
     try {
         const userCredentials = await Usuario.findOne({ where: { USUARIO: username } });
         if (!userCredentials || !bcrypt.compareSync(password, userCredentials.PASSWORD)) {
@@ -117,7 +117,7 @@ const loginDriver = async (req, res) => {
         });
         // VALIDACIÓN: Reglas de Negocio Rigurosas
         if (!driver || driver.STATUS !== true) {
-            return res.status(403).json({ message: 'Conductor no habilitado por administración.' });
+            return res.status(403).json({ message: 'Conductor no habilitado.' });
         }
         if (!driver.Vehiculo || driver.Vehiculo.ESTADO !== 1) {
             return res.status(403).json({ message: 'Vehículo no autorizado por administración.' });
@@ -131,7 +131,7 @@ const loginDriver = async (req, res) => {
         await userCredentials.update({ ESTADO: nuevoEstado });        
         await driver.update({
             IS_ONLINE: true,
-            PERMISOS_ACEPTADOS: permisosDispositivo === true, 
+            PERMISOS_ACEPTADOS: permisosDispositivo === true,
             UBICACION_LAT: lat,
             UBICACION_LON: lon,
             UPDATED_AT: new Date()
