@@ -146,3 +146,24 @@ exports.broadcastNewTrip = (tripData) => {
         global.io.to('drivers_pool').emit('newTripRequest', newTrip);
     }
 };
+
+// Función para enviar viaje SOLO a los conductores más cercanos
+exports.emitToSpecificDrivers = (driverIds, tripData) => {
+    const newTrip = {
+        ...tripData,
+        timestamp: Date.now(),
+        status: 'WAITING'
+    };
+    
+    // Evitar duplicados en la lista global de activos
+    activeTripRequests = activeTripRequests.filter(t => t.id !== tripData.id);
+    activeTripRequests.push(newTrip);
+
+    if (global.io) {
+        // Emitimos un evento exclusivamente a las salas personales de los elegidos
+        driverIds.forEach(driverId => {
+            global.io.to(`driver_room_${driverId}`).emit('newTripRequest', newTrip);
+        });
+        console.log(`📡 [MULTICAST] Viaje ${tripData.id} enviado a ${driverIds.length} conductores cercanos.`);
+    }
+};
