@@ -1,8 +1,8 @@
 // ../services/tripAssignment.js
-
-const { emitToSpecificDrivers } = require('../sockets/socketHandler'); // Cambiamos la importación
+const { emitToSpecificDrivers } = require('../sockets/socketHandler'); 
 const mapboxService = require('./mapboxService');
-const { pool } = require('../config/databases'); // 🔒 Requerido para la consulta PostGIS
+const { pool } = require('../config/databases');
+const Viajes = require('../models/Viajes');
 
 /**
  * Filtra conductores espacialmente y publica la solicitud dirigida.
@@ -63,8 +63,46 @@ const publishTripToPool = async (tripData) => {
             timestamp: Date.now()
         };
 
+        await Viajes.create({
+            ID_VIAJE: tripData.id,
+            CLIENTE_NOMBRE: tripData.client_name,
+            ESTADO: 'PENDIENTE',
+            PICKUP_LAT: pickupLat,
+            PICKUP_LON: pickupLng,
+            DEST_LAT: tripData.dest_lat,
+            DEST_LON: tripData.dest_lng,
+            TARIFA: tripData.amount
+        });
+
         // 3. EMISIÓN DIRIGIDA A LOS SELECCIONADOS
         emitToSpecificDrivers(conductoresCercanos, tripPayload);
+
+        setTimeout(async () => {
+            try {
+                // Intentamos pasar de PENDIENTE a EXPIRADO
+                const queryExpiracion = `
+                    UPDATE "VIAJES"
+                    SET "ESTADO" = 'EXPIRADO'
+                    WHERE "ID_VIAJE" = $1 AND "ESTADO" = 'PENDIENTE'
+                    RETURNING *;
+                `;
+                const expRes = await pool.query(queryExpiracion, [tripData.id]);
+
+                if (expRes.rowCount === 1) {
+                    console.log(`⏰ Viaje ${tripData.id} expiró tras 30 segundos sin respuesta.`);
+                    
+                    // Avisar a los choferes que quiten la tarjeta de su pantalla
+                    if (global.io) {
+                        global.io.to('drivers_pool').emit('tripExpired', { tripId: tripData.id });
+                    }
+                    
+                    // Aquí podrías avisar al cliente que no se encontraron conductores
+                    // o disparar una función recursiva para volver a buscar en un radio de 5km.
+                }
+            } catch (err) {
+                console.error("Error en expiración automática:", err);
+            }
+        }, 30000); // 30,000 ms = 30 segundos
 
         return { success: true, notifiedCount: conductoresCercanos.length };
     } catch (error) {
