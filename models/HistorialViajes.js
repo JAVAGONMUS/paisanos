@@ -14,8 +14,11 @@ const HistorialViajes = sequelizePostgres.define('HistorialViajes', {
     FINAL_LAT: { type: DataTypes.DECIMAL(10, 8), allowNull: true },
     FINAL_LON: { type: DataTypes.DECIMAL(11, 8), allowNull: true },
     STATUS: { 
-        type: DataTypes.ENUM('PENDIENTE', 'ACEPTADA', 'ACTIVA', 'COMPLETADA', 'CANCELADA'),
-        defaultValue: 'PENDIENTE' 
+        type: DataTypes.STRING, // 👈 Cambiado de ENUM a STRING
+        defaultValue: 'PENDIENTE',
+        validate: {
+            isIn: [['PENDIENTE', 'ACEPTADA', 'ACTIVA', 'COMPLETADA', 'CANCELADA']]
+        }
     },
     DISTANCIA_VIAJE: { type: DataTypes.DECIMAL(10, 2), defaultValue: 0 },
     TIEMPO_VIAJE: { type: DataTypes.STRING, allowNull: true },
