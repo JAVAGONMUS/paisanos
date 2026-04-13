@@ -6,22 +6,22 @@ const { Server } = require('socket.io');
 const { Op } = require('sequelize'); 
 require('dotenv').config();
 
-const { authenticateDBs } = require('../config/databases'); 
-const { setupAssociations } = require('../config/associations'); 
+const { authenticateDBs } = require('./config/databases'); 
+const { setupAssociations } = require('./config/associations'); 
 
 // Importación de Modelos para sincronización
-const User = require('../models/User');
-const Usuario = require('../models/Usuario');
-const Driver = require('../models/Driver');
-const Vehiculo = require('../models/Vehiculo');
-const Pais = require('../models/Pais');
-const Departamento = require('../models/Departamento');
-const Municipio = require('../models/Municipio');
-const Dominio = require('../models/Dominio');
+const User = require('./models/User');
+const Usuario = require('./models/Usuario');
+const Driver = require('./models/Driver');
+const Vehiculo = require('./models/Vehiculo');
+const Pais = require('./models/Pais');
+const Departamento = require('./models/Departamento');
+const Municipio = require('./models/Municipio');
+const Dominio = require('./models/Dominio');
 //const HistorialGPS = require('./models/HistorialGPS');
-const HistorialViajes = require('../models/HistorialViajes');
-const Viajes = require('../models/Viajes');
-//const FilesPer = require('../models/FilesPer');
+const HistorialViajes = require('./models/HistorialViajes');
+const Viajes = require('./models/Viajes');
+//const FilesPer = require('./models/FilesPer');
 
 // Lista unificada de modelos para PostgreSQL
 const allModels = [
@@ -31,10 +31,10 @@ const allModels = [
             
 ];
 
-const driverRoutes = require('../routes/driverRoutes'); 
-const ubicacionRoutes = require('../routes/ubicacionRoutes'); 
-const catalogsRoutes = require('../routes/catalogsRoutes');
-const { initSocketIO } = require('../sockets/socketHandler'); 
+const driverRoutes = require('./routes/driverRoutes'); 
+const ubicacionRoutes = require('./routes/ubicacionRoutes'); 
+const catalogsRoutes = require('./routes/catalogsRoutes');
+const { initSocketIO } = require('./sockets/socketHandler'); 
 
 const app = express();
 const server = http.createServer(app);
