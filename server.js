@@ -20,23 +20,15 @@ const Municipio = require('./models/Municipio');
 const Dominio = require('./models/Dominio');
 //const HistorialGPS = require('./models/HistorialGPS');
 //const HistorialViajes = require('./models/HistorialViajes');
-//const Viajes = require('./models/Viajes');
+const Viajes = require('./models/Viajes');
 //const FilesPer = require('./models/FilesPer');
 
 // Lista unificada de modelos para PostgreSQL
 const allModels = [
-    User,
-    Usuario,
-    Driver,
-    Vehiculo,
-    Pais, 
-    Departamento,
-    Municipio, 
-    Dominio
+    User, Usuario, Driver, Vehiculo, Pais, Departamento, Municipio, Dominio, Viajes
     //FilesPer
     //HistorialGPS
-    //HistorialViajes
-    //Viajes    
+    //HistorialViajes        
 ];
 
 const driverRoutes = require('./routes/driverRoutes'); 
