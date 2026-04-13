@@ -6,7 +6,7 @@ const { sequelizePostgres } = require('../config/databases');
 const HistorialViajes = sequelizePostgres.define('HistorialViajes', {
     ID_SOL: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     ID_CL: { type: DataTypes.INTEGER, allowNull: false },
-    ID_COND: { type: DataTypes.INTEGER, allowNull: false },
+    ID_COND: { type: DataTypes.INTEGER, allowNull: true },
     ESPERA_CHOFER: { type: DataTypes.STRING, allowNull: true },
     ESPERA_CLIENTE: { type: DataTypes.STRING, allowNull: true },
     INICIO_LAT: { type: DataTypes.DECIMAL(10, 8), allowNull: false },
