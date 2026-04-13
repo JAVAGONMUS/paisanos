@@ -63,16 +63,25 @@ const publishTripToPool = async (tripData) => {
             timestamp: Date.now()
         };
 
-        await Viajes.create({
-            ID_VIAJE: tripData.id,
-            CLIENTE_NOMBRE: tripData.client_name,
-            ESTADO: 'PENDIENTE',
-            PICKUP_LAT: pickupLat,
-            PICKUP_LON: pickupLng,
-            DEST_LAT: tripData.dest_lat,
-            DEST_LON: tripData.dest_lng,
-            TARIFA: tripData.amount
-        });
+        const queryHistorial = `
+            INSERT INTO "HISTORIAL_VIAJES" 
+            ("ID_CL", "INICIO_LAT", "INICIO_LON", "FINAL_LAT", "FINAL_LON", "STATUS", "TARIFA_ESTIMADA")
+            VALUES ($1, $2, $3, $4, $5, 'PENDIENTE', $6)
+            RETURNING "ID_SOL";
+        `;
+
+        const histRes = await pool.query(queryHistorial, [
+            tripData.client_id || 1, // ID Cliente
+            pickupLat, pickupLng, tripData.dest_lat, tripData.dest_lng, tripData.amount
+        ]);
+        
+        const idSolGenerado = histRes.rows[0].ID_SOL;
+        await pool.query(`
+            INSERT INTO "VIAJES_ACTIVOS" ("ID_SOL", "STATUS", "TARIFA")
+            VALUES ($1, 'PENDIENTE', $2)
+        `, [idSolGenerado, tripData.amount]);
+
+        tripPayload.id = idSolGenerado;
 
         // 3. EMISIÓN DIRIGIDA A LOS SELECCIONADOS
         emitToSpecificDrivers(conductoresCercanos, tripPayload);
