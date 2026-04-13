@@ -178,48 +178,44 @@ exports.initSocketIO = (io) => {
         });z
 
         socket.on('acceptTrip', async ({ tripId }) => {
-            const driverId = socket.user.id; // Seguridad: ID real del token
+            const driverId = socket.user.id; 
             
             try {
-                // EL BLINDAJE: Update Atómico. 
-                // Solo se actualizará si el estado es PENDIENTE. Si otro chofer ya lo ganó,
-                // la condición "ESTADO = 'PENDIENTE'" será falsa y rowCount será 0.
+                // EL BLINDAJE: Atacamos VIAJES_ACTIVOS
                 const query = `
-                    UPDATE "VIAJES"
-                    SET "ID_COND" = $1, "ESTADO" = 'ACEPTADO'
-                    WHERE "ID_VIAJE" = $2 AND "ESTADO" = 'PENDIENTE'
+                    UPDATE "VIAJES_ACTIVOS"
+                    SET "STATUS" = 'ACEPTADA'
+                    WHERE "ID_SOL" = $1 AND "STATUS" = 'PENDIENTE'
                     RETURNING *;
                 `;
                 
-                const res = await pool.query(query, [driverId, tripId]);
+                const res = await pool.query(query, [tripId]);
 
                 if (res.rowCount === 1) {
-                    // 🎉 ¡Este conductor ganó el viaje!
-                    console.log(`✅ Viaje ${tripId} asignado exitosamente al conductor ${driverId}`);
+                    // ¡Este conductor ganó! Actualizamos el Historial Oficial
+                    await pool.query(`
+                        UPDATE "HISTORIAL_VIAJES"
+                        SET "ID_COND" = $1, "STATUS" = 'ACEPTADA', "ACCEPTED_AT" = CURRENT_TIMESTAMP
+                        WHERE "ID_SOL" = $2
+                    `, [driverId, tripId]);
+
+                    console.log(`✅ Viaje ${tripId} asignado al conductor ${driverId}`);
                     
-                    // 1. Confirmarle al ganador
                     socket.emit('tripAcceptedSuccess', { trip: res.rows[0] });
-                    
-                    // 2. Avisarle a la sala global que el viaje ya no está disponible
                     io.to('drivers_pool').emit('tripTaken', { tripId });
                     
-                    // 3. Quitarlo de la memoria local
                     activeTripRequests = activeTripRequests.filter(t => t.id !== tripId);
 
-                    // 4. Aquí podrías emitirle al cliente (pasajero) que su conductor va en camino
-                    // global.io.to(`client_room_${res.rows[0].ID_CLIENTE}`).emit('driverAssigned', { driverId });
-
                 } else {
-                    // ❌ Otro conductor fue más rápido o el viaje expiró
-                    console.warn(`⚠️ Conductor ${driverId} intentó aceptar viaje ${tripId} pero ya no está disponible.`);
+                    // Otro paisano se lo llevó
                     socket.emit('tripAlreadyTaken', { 
                         tripId, 
-                        mensaje: 'El viaje ya fue asignado a otro conductor cercano o expiró.' 
+                        mensaje: 'El viaje ya fue asignado o expiró.' 
                     });
                 }
             } catch (error) {
-                console.error("❌ Error crítico al aceptar viaje:", error);
-                socket.emit('tripAcceptanceError', { mensaje: 'Error de red. Intenta de nuevo.' });
+                console.error("❌ Error crítico al aceptar:", error);
+                socket.emit('tripAcceptanceError', { mensaje: 'Error de red.' });
             }
         });
     });
