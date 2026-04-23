@@ -22,15 +22,17 @@ const Dominio = require('./models/Dominio');
 const HistorialViajes = require('./models/HistorialViajes');
 const Viajes = require('./models/Viajes');
 //const FilesPer = require('./models/FilesPer');
+const Cliente = require('./models/Cliente');
 
 // Lista unificada de modelos para PostgreSQL
 const allModels = [
-    User, Usuario, Driver, Vehiculo, Pais, Departamento, Municipio, Dominio, Viajes, HistorialViajes
+    User, Usuario, Driver, Vehiculo, Pais, Departamento, Municipio, Dominio, Viajes, HistorialViajes, Cliente
     //FilesPer
     //HistorialGPS
             
 ];
 
+const clientRoutes = require('./routes/clientRoutes');
 const driverRoutes = require('./routes/driverRoutes'); 
 const ubicacionRoutes = require('./routes/ubicacionRoutes'); 
 const catalogsRoutes = require('./routes/catalogsRoutes');
@@ -64,6 +66,7 @@ app.use(express.json());
 app.use('/api/drivers', driverRoutes);
 app.use('/api/ubicacion', ubicacionRoutes); 
 app.use('/api/catalogs', catalogsRoutes);
+app.use('/api/clientes', clientRoutes);
 
 // Inicializar lógica de sockets
 initSocketIO(io);
