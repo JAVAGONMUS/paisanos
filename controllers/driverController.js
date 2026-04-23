@@ -181,7 +181,7 @@ const loginDriver = async (req, res) => {
 
         const token = jwt.sign(
             { id: driver.ID_COND, userId: userCredentials.ID_PERSO },
-            process.env.JWT_SECRET, { expiresIn: '24h' }
+            process.env.JWT_SECRET_DRIVER, { expiresIn: '24h' }
         );
 
         res.json({
