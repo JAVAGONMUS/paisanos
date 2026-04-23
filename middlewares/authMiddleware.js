@@ -16,7 +16,7 @@ const verifyToken = (req, res, next) => {
     const token = authHeader.split(' ')[1];
 
     try {
-        const verified = jwt.verify(token, process.env.JWT_SECRET);
+        const verified = jwt.verify(token, process.env.JWT_SECRET_DRIVER);
         
         // Adjuntamos el objeto verificado a req.user
         // verified contiene: { id, userId, role }
