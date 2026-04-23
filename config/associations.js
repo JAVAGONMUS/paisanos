@@ -1,3 +1,5 @@
+//    ../config/associations.js
+
 const User = require('../models/User');
 const Usuario = require('../models/Usuario');
 const Driver = require('../models/Driver');
@@ -5,7 +7,7 @@ const Vehiculo = require('../models/Vehiculo');
 const Pais = require('../models/Pais');
 const Departamento = require('../models/Departamento');
 const Municipio = require('../models/Municipio'); 
-
+const Cliente = require('../models/Cliente');
 exports.setupAssociations = () => {
     // 1. Relación Usuario <-> Persona
     Usuario.belongsTo(User, { foreignKey: 'ID_PERSO', as: 'persona' });
@@ -30,5 +32,8 @@ exports.setupAssociations = () => {
     Pais.hasMany(Driver, { foreignKey: 'ID_PAIS' });
     Driver.belongsTo(Pais, { foreignKey: 'ID_PAIS', as: 'paisOrigen' });
     
-    return { User, Usuario, Driver, Vehiculo, Pais, Departamento, Municipio };
+    Cliente.belongsTo(User, { foreignKey: 'ID_PERSO', as: 'datosPersonalesCliente' });
+    User.hasOne(Cliente, { foreignKey: 'ID_PERSO', as: 'perfilCliente' });
+
+    return { User, Usuario, Driver, Vehiculo, Pais, Departamento, Municipio, Cliente };
 };
